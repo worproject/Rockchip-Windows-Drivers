@@ -9,7 +9,7 @@ This repository contains drivers for RK35xx-based platforms, with a focus on RK3
 |USB 2.0 & 1.1|usbehci (Inbox)|🔴 Not working|Windows bugchecks if enabled. USBOHCI driver for USB 1.1 is missing in ARM64 builds.|
 |PCIe 3.0 & 2.1|pci (Inbox)|🔴 Not working|MSI & ITS silicon bugs, bad ACPI descriptors|
 |SATA|mshdc (Inbox)|🔴 Not working|If enabled, drive enumerates with no IDs and hangs.|
-|eMMC||🔴 Not working||
+|eMMC|[dwcsdhc](https://github.com/worproject/Rockchip-Windows-Drivers/tree/master/drivers/sd/dwcsdhc)|🟢 Working||
 |SD/SDIO||🔴 Not working||
 |CPU frequency scaling||🔴 Not working|Clocks limited at values set by UEFI.|
 |HDMI output|MSBDD (Inbox)|🟢 Working|Single display with mode limited at 1080p 60 Hz, provided by UEFI GOP.|

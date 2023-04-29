@@ -1,0 +1,138 @@
+;/*++
+;
+;Copyright (c) 2014 Microsoft Corporation. All rights Reserved.
+;Copyright (c) 2023 Mario Bălănică <mariobalanica02@gmail.com>
+;
+;Module Name:
+;
+;    dwcsdhc.inf
+;
+;Abstract:
+;
+;    INF file for installing the Synopsys DesignWare Core SD Host Controller driver.
+;
+;--*/
+
+[Version]
+Signature="$Windows NT$"
+Class=SDHost
+ClassGUID={a0a588a4-c46f-4b37-b7ea-c82fe89870c6}
+Provider=%ProviderString%
+CatalogFile=dwcsdhc.cat
+PnpLockdown=1
+
+[SourceDisksNames]
+1 = Disk
+
+[SourceDisksFiles]
+dwcsdhc.sys = 1
+
+[Manufacturer]
+%RKCP%=RKCP,NT$ARCH$
+
+[ControlFlags]
+BasicDriverOk=*
+ExcludeFromSelect=*
+
+;
+; Rockchip models
+;
+
+[RKCP.NT$ARCH$]
+%ACPI\RKCP0D40.DeviceDesc%=DWCSDHC, ACPI\RKCP0D40
+
+;
+; Service install
+;
+
+[dwcsdhc_Service_Inst]
+ServiceType    = %SERVICE_KERNEL_DRIVER%
+StartType      = %SERVICE_DEMAND_START%
+ErrorControl   = %SERVICE_ERROR_NORMAL%
+ServiceBinary  = %13%\dwcsdhc.sys
+LoadOrderGroup = System Bus Extender
+AddReg         = DWCSDHC_ServiceReg
+
+;
+; Registry keys
+;
+
+[DWCSDHC_LocationReg]
+HKR,,UINumberDescFormat,,%DWCSDHC_Slot%
+
+[DWCSDHC_Reg]
+HKR,,Driver,,"dwcsdhc.sys"
+
+[DWCSDHC_ServiceReg]
+HKR,,BootFlags,0x00010003,0x00000008
+HKR,Parameters,SdCmdFlags,1,    05,01, 06,01, 08,11, 09,19, 0A,19, 0D,11, \
+                                10,01, 11,01, 12,01, 17,01, 18,05, 19,05, \
+                                1A,01, 1B,01, 1C,01, \
+                                20,05, 21,05, 26,05, \
+                                2A,01, \
+                                34,02, 35,02, \
+                                37,01, 38,01, \
+                                22,01, 23,05, 24,01, 25,01
+
+HKR,Parameters,SdAppCmdFlags,1, 06,01, 0D,01, 16,01, 17,01, 33,01, \
+                                12,01, 19,01, 1A,01, 26,01, 2B,01, \
+                                2C,01, 2D,01, 2E,01, 2F,01, 30,01, 31,01
+
+;
+; Copy Files
+;
+
+[DWCSDHC_CopyFiles]
+dwcsdhc.sys
+
+[DestinationDirs]
+DWCSDHC_CopyFiles=13
+
+;
+; Controller Specific Sections
+;
+
+[DWCSDHC]
+CopyFiles=DWCSDHC_CopyFiles
+AddReg=DWCSDHC_Reg
+
+[DWCSDHC.Services]
+AddService = dwcsdhc, 2, dwcsdhc_Service_Inst
+
+[DWCSDHC.HW]
+AddReg=DWCSDHC_LocationReg
+
+[Strings]
+;
+; Localizable strings below
+;
+
+RKCP="Rockchip"
+
+ACPI\RKCP0D40.DeviceDesc="Synopsys DesignWare SD/eMMC Host Controller"
+
+;
+; Slot description string
+;
+
+DWCSDHC_Slot="SD Host Slot %1!u!"
+
+;
+; Non-localizable strings below
+;
+
+SERVICE_KERNEL_DRIVER = 1
+SERVICE_BOOT_START    = 0
+SERVICE_SYSTEM_START  = 1
+SERVICE_DEMAND_START  = 3
+SERVICE_ERROR_NORMAL  = 1
+SERVICE_ERROR_IGNORE  = 0
+REG_EXPAND_SZ         = 0x00020000
+REG_DWORD             = 0x00010001
+REG_SZ                = 0x00000000
+
+;
+; Manufacturer name strings
+;
+
+ProviderString="Windows on R Project"
