@@ -1,0 +1,52 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - '*'
+  pull_request:
+    branches:
+      - master
+      
+env:
+  SOLUTION_FILE_PATH: .\build\RockchipDrivers.sln
+
+jobs:
+  build:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        PLATFORM: [ARM64]
+        CONFIGURATION: [Debug, Release]
+    env:
+      DRIVER_OUTPUT_DIR: build\${{matrix.PLATFORM}}\${{matrix.CONFIGURATION}}\Output
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+      
+    - name: Add msbuild to PATH
+      uses: microsoft/setup-msbuild@v1.1
+  
+    - name: Build solution
+      working-directory: ${{env.GITHUB_WORKSPACE}}
+      run: msbuild /m /p:Configuration=${{matrix.CONFIGURATION}} /p:Platform=${{matrix.PLATFORM}} ${{env.SOLUTION_FILE_PATH}}
+      
+    - name: Bundle symbols
+      run: |
+        Get-ChildItem -Path $env:DRIVER_OUTPUT_DIR -Directory | ForEach-Object {
+            Copy-Item -Path "$env:DRIVER_OUTPUT_DIR\$($_.Name).pdb" -Destination $_.FullName
+        }
+      
+    - name: Get version tag
+      id: get_version_tag
+      run: |
+        $version = git describe --tags --always
+        Write-Output "version=$($version)" >> $env:GITHUB_OUTPUT
+        
+    - name: Upload unsigned driver package artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: RkDrvPkg_${{matrix.PLATFORM}}_${{matrix.CONFIGURATION}}_${{steps.get_version_tag.outputs.version}}_unsigned
+        path: ${{env.DRIVER_OUTPUT_DIR}}/*/

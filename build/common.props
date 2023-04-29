@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?> 
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ImportGroup Label="PropertySheets" />
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Label="PropertySheets">
+    <ConversionToolVersion>1.0</ConversionToolVersion>
+    <IntDir Condition="'$(Platform)'!='Win32'">$(SolutionDir)$(Platform)\$(Configuration)\Intermediate\$(TargetName)\</IntDir>
+    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\Output\</OutDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <WppEnabled>true</WppEnabled>
+      <WppRecorderEnabled>true</WppRecorderEnabled>
+      <DisableSpecificWarnings>4595;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+    </ClCompile>
+    <PkgGen>
+      <Variables>"OEMNAME=WoR;BSPARCH=$(Platform);_RELEASEDIR=$(SolutionDir)$(Platform)\$(Configuration)\;TARGETNAME=$(TargetName);TARGETEXT=$(TargetExt);$(PkgGen_DefaultDriverDest)"</Variables>
+      <AdditionalOptions>/onecore %(AdditionalOptions)</AdditionalOptions>
+    </PkgGen>	
+   </ItemDefinitionGroup>
+   <PropertyGroup>
+    <SignMode>Off</SignMode>
+    <EnableInf2cat>true</EnableInf2cat>
+   </PropertyGroup>
+   <ItemGroup />
+</Project>
