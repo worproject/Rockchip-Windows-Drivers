@@ -5,16 +5,16 @@ This repository contains drivers for RK35xx-based platforms, with a focus on RK3
 |Device|Driver|Status|Additional information|
 | --- | --- | --- | --- |
 |USB 3 Host|usbxhci (Inbox)|🟢 Working|USB 3.0-only due to hardware limitation, shared USB 2 is provided by dedicated controllers.|
-|USB 3 Dual Role|usbxhci (Inbox)|🟡 Partially working|Host mode and USB 2.0-only, no dual role capability. Depends on USB/DP Alt Mode switching.|
+|USB 3 Dual Role|usbxhci (Inbox)|🟡 Partially working|Host mode, no dual role capability. Depends on USB/DP Alt Mode switching.<br> USB 3.0 only works in one orientation of the Type-C connector.|
 |USB 2.0 & 1.1|usbehci (Inbox)|🔴 Not working|Windows bugchecks if enabled. USBOHCI driver for USB 1.1 is missing in ARM64 builds.|
-|PCIe 3.0 & 2.1|pci (Inbox)|🔴 Not working|MSI & ITS silicon bugs, bad ACPI descriptors|
-|SATA|mshdc (Inbox)|🔴 Not working|If enabled, drive enumerates with no IDs and hangs.|
+|PCIe 3.0 & 2.1|pci (Inbox)|🟡 Partially working|Only known working device is a Wi-Fi card with Marvell 88W8897 chipset (AW-CB178NF M.2 module) and driver from [NXP's i.MX BSP](https://www.nxp.com/design/software/embedded-software/i-mx-software/windows-10-iot-enterprise-for-i-mx-applications-processors:IMXWIN10IOT).<br> Anything else causes the OS to hang.|
+|SATA|storahci (Inbox)|🔴 Not working|If enabled, drive enumerates with no IDs and hangs.|
 |eMMC|[dwcsdhc](https://github.com/worproject/Rockchip-Windows-Drivers/tree/master/drivers/sd/dwcsdhc)|🟢 Working||
 |SD/SDIO||🔴 Not working||
 |CPU frequency scaling||🔴 Not working|Clocks limited at values set by UEFI.|
-|HDMI output|MSBDD (Inbox)|🟢 Working|Single display with mode limited at 1080p 60 Hz, provided by UEFI GOP.|
+|HDMI output|MSBDD (Inbox)|🟡 Partially working|Single display with mode limited at 1080p 60 Hz, provided by UEFI GOP.|
 |HDMI input||🔴 Not working||
-|DisplayPort output||🔴 Not working||
+|DisplayPort output|MSBDD (Inbox)|🟡 Partially working|Single display with mode limited at 1080p 60 Hz, provided by UEFI GOP. Only works in one orientation of the Type-C connector.|
 |HDMI audio||🔴 Not working||
 |DisplayPort audio||🔴 Not working||
 |Analog audio||🔴 Not working||
