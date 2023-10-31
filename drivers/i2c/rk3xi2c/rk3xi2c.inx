@@ -1,0 +1,77 @@
+;/*++
+;
+;Copyright (c) CoolStar.  All rights reserved.
+;
+;Module Name:
+;    rk3xi2c.inf
+;
+;Abstract:
+;    INF file for installing the RockChip I2C Controller Driver
+;
+;
+;--*/
+
+[Version]
+Signature   = "$WINDOWS NT$"
+Class       = System
+ClassGuid   = {4d36e97d-e325-11ce-bfc1-08002be10318}
+Provider    = CoolStar
+DriverVer   = 6/30/2023,1.0.0
+CatalogFile = rk3xi2c.cat
+PnpLockdown = 1
+
+[DestinationDirs]
+DefaultDestDir = 12
+
+; ================= Class section =====================
+
+[SourceDisksNames]
+1 = %DiskId1%,,,""
+
+[SourceDisksFiles]
+rk3xi2c.sys  = 1,,
+
+;*****************************************
+; Rk3xI2C  Install Section
+;*****************************************
+
+[Manufacturer]
+%StdMfg%=Standard,NT$ARCH$.10.0...14393
+
+; Decorated model section take precedence over undecorated 
+; ones on XP and later.
+[Standard.NT$ARCH$.10.0...14393]
+%Rk3xI2C.DeviceDesc%=Rk3xI2C_Device, ACPI\RKCP3001
+
+[Rk3xI2C_Device.NT]
+CopyFiles=Drivers_Dir
+
+[Rk3xI2C_Device.NT.HW]
+AddReg=Rk3xI2C_AddReg
+
+[Drivers_Dir]
+rk3xi2c.sys
+
+[Rk3xI2C_AddReg]
+; Set to 1 to connect the first interrupt resource found, 0 to leave disconnected
+HKR,Settings,"ConnectInterrupt",0x00010001,0
+
+;-------------- Service installation
+[Rk3xI2C_Device.NT.Services]
+AddService = Rk3xI2C,%SPSVCINST_ASSOCSERVICE%, Rk3xI2C_Service_Inst
+
+; -------------- Rk3xI2C driver install sections
+[Rk3xI2C_Service_Inst]
+DisplayName    = %Rk3xI2C.SVCDESC%
+ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
+StartType      = 3               ; SERVICE_DEMAND_START 
+ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %12%\rk3xi2c.sys
+LoadOrderGroup = Base
+
+[Strings]
+SPSVCINST_ASSOCSERVICE= 0x00000002
+StdMfg                 = "Rockchip"
+DiskId1                = "RockChip I2C Controller Installation Disk #1"
+Rk3xI2C.DeviceDesc = "RockChip I2C Controller"
+Rk3xI2C.SVCDESC    = "RockChip I2C Controller Service"

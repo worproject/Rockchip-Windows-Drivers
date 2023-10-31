@@ -1,0 +1,77 @@
+;/*++
+;
+;Copyright (c) CoolStar.  All rights reserved.
+;
+;Module Name:
+;    rk3xgpio.inf
+;
+;Abstract:
+;    INF file for installing the RockChip GPIO Controller Driver
+;
+;
+;--*/
+
+[Version]
+Signature   = "$WINDOWS NT$"
+Class       = System
+ClassGuid   = {4d36e97d-e325-11ce-bfc1-08002be10318}
+Provider    = CoolStar
+DriverVer   = 6/30/2023,1.0.0
+CatalogFile = rk3xgpio.cat
+PnpLockdown = 1
+
+[DestinationDirs]
+DefaultDestDir = 12
+
+; ================= Class section =====================
+
+[SourceDisksNames]
+1 = %DiskId1%,,,""
+
+[SourceDisksFiles]
+rk3xgpio.sys  = 1,,
+
+;*****************************************
+; Rk3xGPIO  Install Section
+;*****************************************
+
+[Manufacturer]
+%StdMfg%=Standard,NT$ARCH$.10.0...14393
+
+; Decorated model section take precedence over undecorated 
+; ones on XP and later.
+[Standard.NT$ARCH$.10.0...14393]
+%Rk3xGPIO.DeviceDesc%=Rk3xGPIO_Device, ACPI\RKCP3002
+
+[Rk3xGPIO_Device.NT]
+CopyFiles=Drivers_Dir
+
+[Rk3xGPIO_Device.NT.HW]
+AddReg=Rk3xGPIO_AddReg
+
+[Drivers_Dir]
+rk3xgpio.sys
+
+[Rk3xGPIO_AddReg]
+; Set to 1 to connect the first interrupt resource found, 0 to leave disconnected
+HKR,Settings,"ConnectInterrupt",0x00010001,0
+
+;-------------- Service installation
+[Rk3xGPIO_Device.NT.Services]
+AddService = Rk3xGPIO,%SPSVCINST_ASSOCSERVICE%, Rk3xGPIO_Service_Inst
+
+; -------------- Rk3xGPIO driver install sections
+[Rk3xGPIO_Service_Inst]
+DisplayName    = %Rk3xGPIO.SVCDESC%
+ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
+StartType      = 3               ; SERVICE_DEMAND_START 
+ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %12%\rk3xgpio.sys
+LoadOrderGroup = Base
+
+[Strings]
+SPSVCINST_ASSOCSERVICE= 0x00000002
+StdMfg                 = "Rockchip"
+DiskId1                = "RockChip GPIO Controller Installation Disk #1"
+Rk3xGPIO.DeviceDesc = "Rockchip GPIO Controller"
+Rk3xGPIO.SVCDESC    = "RockChip GPIO Service"
