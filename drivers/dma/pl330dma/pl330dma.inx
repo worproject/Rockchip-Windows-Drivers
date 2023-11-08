@@ -1,0 +1,77 @@
+;/*++
+;
+;Copyright (c) CoolStar.  All rights reserved.
+;
+;Module Name:
+;    pl330dma.inf
+;
+;Abstract:
+;    INF file for installing the ARM Primecell DMA Driver
+;
+;
+;--*/
+
+[Version]
+Signature   = "$WINDOWS NT$"
+Class       = System
+ClassGuid   = {4d36e97d-e325-11ce-bfc1-08002be10318}
+Provider    = CoolStar
+DriverVer   = 6/30/2023,1.0.0
+CatalogFile = pl330dma.cat
+PnpLockdown = 1
+
+[DestinationDirs]
+DefaultDestDir = 12
+
+; ================= Class section =====================
+
+[SourceDisksNames]
+1 = %DiskId1%,,,""
+
+[SourceDisksFiles]
+pl330dma.sys  = 1,,
+
+;*****************************************
+; Pl330DMA  Install Section
+;*****************************************
+
+[Manufacturer]
+%StdMfg%=Standard,NT$ARCH$.10.0...14393
+
+; Decorated model section take precedence over undecorated 
+; ones on XP and later.
+[Standard.NT$ARCH$.10.0...14393]
+%Pl330DMA.DeviceDesc%=Pl330DMA_Device, ACPI\ARMH0330
+
+[Pl330DMA_Device.NT]
+CopyFiles=Drivers_Dir
+
+[Pl330DMA_Device.NT.HW]
+AddReg=Pl330DMA_AddReg
+
+[Drivers_Dir]
+pl330dma.sys
+
+[Pl330DMA_AddReg]
+; Set to 1 to connect the first interrupt resource found, 0 to leave disconnected
+HKR,Settings,"ConnectInterrupt",0x00010001,0
+
+;-------------- Service installation
+[Pl330DMA_Device.NT.Services]
+AddService = Pl330DMA,%SPSVCINST_ASSOCSERVICE%, Pl330DMA_Service_Inst
+
+; -------------- Pl330DMA driver install sections
+[Pl330DMA_Service_Inst]
+DisplayName    = %Pl330DMA.SVCDESC%
+ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
+StartType      = 3               ; SERVICE_DEMAND_START 
+ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %12%\pl330dma.sys
+LoadOrderGroup = Base
+
+[Strings]
+SPSVCINST_ASSOCSERVICE= 0x00000002
+StdMfg                 = "Arm"
+DiskId1                = "Arm Primecell Installation Disk #1"
+Pl330DMA.DeviceDesc = "Arm Primecell DMA Controller"
+Pl330DMA.SVCDESC    = "Arm Primecell DMA Controller Service"
