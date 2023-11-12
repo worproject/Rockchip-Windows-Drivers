@@ -134,6 +134,8 @@ UINT32 read32(PRK3XI2C_CONTEXT pDevice, UINT32 reg);
 void write32(PRK3XI2C_CONTEXT pDevice, UINT32 reg, UINT32 val);
 
 BOOLEAN rk3x_i2c_irq(WDFINTERRUPT Interrupt, ULONG MessageID);
+void rk3x_i2c_dpc(WDFINTERRUPT Interrupt, WDFOBJECT AssociatedObject);
+
 NTSTATUS i2c_xfer(PRK3XI2C_CONTEXT pDevice,
     _In_ SPBTARGET SpbTarget,
     _In_ SPBREQUEST SpbRequest,
