@@ -65,7 +65,7 @@ static void rk3x_i2c_stop(PRK3XI2C_CONTEXT pDevice, NTSTATUS status)
 
 		/* signal that we are finished with the current msg */
 		Rk3xI2CPrint(DEBUG_LEVEL_ERROR, DBG_IOCTL, "%s: Signal complete\n", __func__);
-		KeSetEvent(&pDevice->waitEvent, IO_NO_INCREMENT, FALSE);
+		WdfInterruptQueueDpcForIsr(pDevice->Interrupt);
 	}
 }
 
@@ -257,7 +257,7 @@ static void rk3x_i2c_handle_stop(PRK3XI2C_CONTEXT pDevice, unsigned int ipd)
 
 	/* signal rk3x_i2c_xfer that we are finished */
 	Rk3xI2CPrint(DEBUG_LEVEL_ERROR, DBG_IOCTL, "%s: Signal complete\n", __func__);
-	KeSetEvent(&pDevice->waitEvent, IO_NO_INCREMENT, FALSE);
+	WdfInterruptQueueDpcForIsr(pDevice->Interrupt);
 }
 
 BOOLEAN rk3x_i2c_irq(WDFINTERRUPT Interrupt, ULONG MessageID)
@@ -317,6 +317,15 @@ BOOLEAN rk3x_i2c_irq(WDFINTERRUPT Interrupt, ULONG MessageID)
 
 out:
 	return TRUE;
+}
+
+void rk3x_i2c_dpc(WDFINTERRUPT Interrupt, WDFOBJECT AssociatedObject) {
+	UNREFERENCED_PARAMETER(AssociatedObject);
+
+	WDFDEVICE Device = WdfInterruptGetDevice(Interrupt);
+	PRK3XI2C_CONTEXT pDevice = GetDeviceContext(Device);
+
+	KeSetEvent(&pDevice->waitEvent, IO_NO_INCREMENT, FALSE);
 }
 
 /**

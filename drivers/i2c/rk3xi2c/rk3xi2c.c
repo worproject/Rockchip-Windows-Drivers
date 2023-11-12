@@ -490,7 +490,7 @@ IN PWDFDEVICE_INIT DeviceInit
 	WDF_INTERRUPT_CONFIG_INIT(
 		&interruptConfig,
 		rk3x_i2c_irq,
-		NULL);
+		rk3x_i2c_dpc);
 
 	status = WdfInterruptCreate(
 		device,
