@@ -4,12 +4,12 @@ This repository contains drivers for RK35xx-based platforms, with a focus on RK3
 ## Hardware support status
 |Device|Driver|Status|Additional information|
 | --- | --- | --- | --- |
-|USB 3 Host ports #1 and #2|usbxhci (Inbox)|🟢 Working|The "full" USB-3 ports (USB3OTG_0, USB3OTG_1) work correctly. Note that RK3588 devices (e.g. Opi5+) have 2 "full" USB-3 ports, while RK3588s devices (e.g. Opi5, Opi5B) have only 1 "full" USB-3 port.|
-|USB 3 Host port #3|usbxhci (Inbox)|🟡 Partially working|USB-3 only, won't support USB-2 or USB-1 devices (even if you use a hub).<br> One of the USB-3 ports works by combining a USB3-only xHCI port with a USB2 EHCI+OHCI port. Since EHCI+OCHI aren't working (#4), this port will work for USB-3 devices but not for USB2 or USB1 devices.|
+|USB 3 Host ports 0 and 1|usbxhci (Inbox)|🟢 Working|The "full" USB3 port(s) work correctly.<br> Note that RK3588 devices (e.g. Opi5+) have 2 "full" USB3 ports, while RK3588s devices (e.g. Opi5, Opi5B) have only 1 "full" USB3 port.|
+|USB 3 Host port 2|usbxhci (Inbox)|🟡 Partially working|USB3 only, won't support USB2 or USB1 devices even if you use a hub.<br> USB3 port 2 works by combining a USB3-only xHCI port with a USB2 EHCI+OHCI port. Since EHCI+OHCI aren't working (issue #4), this port will work for USB3 devices but not for USB2 or USB1 devices.|
 |USB 3 Dual Role|usbxhci (Inbox)|🟡 Partially working|Host mode, no dual role capability. Depends on USB/DP Alt Mode switching.<br> USB 3.0 only works in one orientation of the Type-C connector.|
-|USB 2.0 & 1.1|usbehci (Inbox)|🔴 Not working|Windows bugchecks if EHCI device enabled (#4). USBOHCI driver for USB 1.1 is missing in ARM64 builds (#5).|
-|PCIe 3.0 & 2.1|pci (Inbox)|🟡 Partially working|NVMe SSDs do not work with in-box storport.sys (#6, workaround available). Other PCIe devices (non-SSD) do work ok if drivers are available for them.|
-|SATA|storahci (Inbox)|🔴 Not working|NVMe SSDs do not work with in-box storport.sys (#6, workaround available).|
+|USB 2.0 & 1.1|usbehci (Inbox)|🔴 Not working|Disabled by default in UEFI.<br> Windows bugchecks if EHCI device enabled (issue #4).<br> USBOHCI driver for USB 1.1 is missing in ARM64 builds (issue #5).|
+|PCIe 3.0 & 2.1|pci (Inbox)|🟡 Partially working|NVMe SSDs do not work with in-box storport.sys (issue #6, workaround available). Other PCIe devices (non-SSD) work ok if drivers are available for them.|
+|SATA|storahci (Inbox)|🔴 Not working|SATA SSDs do not work with in-box storport.sys (issue #6, workaround available).|
 |eMMC|[dwcsdhc](https://github.com/worproject/Rockchip-Windows-Drivers/tree/master/drivers/sd/dwcsdhc)|🟢 Working||
 |SD/SDIO||🔴 Not working||
 |CPU frequency scaling||🔴 Not working|Clocks limited at values set by UEFI.|
