@@ -4,11 +4,12 @@ This repository contains drivers for RK35xx-based platforms, with a focus on RK3
 ## Hardware support status
 |Device|Driver|Status|Additional information|
 | --- | --- | --- | --- |
-|USB 3 Host|usbxhci (Inbox)|🟢 Working|USB 3.0-only due to hardware limitation, shared USB 2 is provided by dedicated controllers.|
+|USB 3 Host ports #1 and #2|usbxhci (Inbox)|🟢 Working|The "full" USB-3 ports (USB3OTG_0, USB3OTG_1) work correctly. Note that RK3588 devices (e.g. Opi5+) have 2 "full" USB-3 ports, while RK3588s devices (e.g. Opi5, Opi5B) have only 1 "full" USB-3 port.|
+|USB 3 Host port #3|usbxhci (Inbox)|🟡 Partially working|USB-3 only, won't support USB-2 or USB-1 devices (even if you use a hub).<br> One of the USB-3 ports works by combining a USB3-only xHCI port with a USB2 EHCI+OHCI port. Since EHCI+OCHI aren't working (#4), this port will work for USB-3 devices but not for USB2 or USB1 devices.|
 |USB 3 Dual Role|usbxhci (Inbox)|🟡 Partially working|Host mode, no dual role capability. Depends on USB/DP Alt Mode switching.<br> USB 3.0 only works in one orientation of the Type-C connector.|
-|USB 2.0 & 1.1|usbehci (Inbox)|🔴 Not working|Windows bugchecks if enabled. USBOHCI driver for USB 1.1 is missing in ARM64 builds.|
-|PCIe 3.0 & 2.1|pci (Inbox)|🟡 Partially working|Only known working device is a Wi-Fi card with Marvell 88W8897 chipset (AW-CB178NF M.2 module) and driver from [NXP's i.MX BSP](https://www.nxp.com/design/software/embedded-software/i-mx-software/windows-10-iot-enterprise-for-i-mx-applications-processors:IMXWIN10IOT).<br> Anything else causes the OS to hang.|
-|SATA|storahci (Inbox)|🔴 Not working|If enabled, drive enumerates with no IDs and hangs.|
+|USB 2.0 & 1.1|usbehci (Inbox)|🔴 Not working|Windows bugchecks if EHCI device enabled (#4). USBOHCI driver for USB 1.1 is missing in ARM64 builds (#5).|
+|PCIe 3.0 & 2.1|pci (Inbox)|🟡 Partially working|NVMe SSDs do not work with in-box storport.sys (#6, workaround available). Other PCIe devices (non-SSD) do work ok if drivers are available for them.|
+|SATA|storahci (Inbox)|🔴 Not working|NVMe SSDs do not work with in-box storport.sys (#6, workaround available).|
 |eMMC|[dwcsdhc](https://github.com/worproject/Rockchip-Windows-Drivers/tree/master/drivers/sd/dwcsdhc)|🟢 Working||
 |SD/SDIO||🔴 Not working||
 |CPU frequency scaling||🔴 Not working|Clocks limited at values set by UEFI.|
