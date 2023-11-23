@@ -1,5 +1,7 @@
 #pragma once
 
+#define POOL_ZERO_DOWN_LEVEL_SUPPORT
+
 #include <Ntddk.h>
 
 extern "C" {
@@ -21,5 +23,3 @@ extern "C" {
 
 #define INIT_SEGMENT_END \
     __pragma(code_seg(pop))
-
-#define POOL_ZERO_DOWN_LEVEL_SUPPORT
