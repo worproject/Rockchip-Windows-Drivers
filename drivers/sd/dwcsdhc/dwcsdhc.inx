@@ -31,7 +31,6 @@ dwcsdhc.sys = 1
 %RKCP%=RKCP,NT$ARCH$
 
 [ControlFlags]
-BasicDriverOk=*
 ExcludeFromSelect=*
 
 ;
