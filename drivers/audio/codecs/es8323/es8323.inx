@@ -16,7 +16,6 @@ Signature   = "$WINDOWS NT$"
 Class       = Media
 ClassGuid   = {4d36e96c-e325-11ce-bfc1-08002be10318}
 Provider    = CoolStar
-DriverVer   = 12/16/2021,1.0.0
 CatalogFile = es8323.cat
 PnpLockdown = 1
 
