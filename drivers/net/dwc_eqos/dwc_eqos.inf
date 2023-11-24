@@ -1,0 +1,121 @@
+; MIT License
+;
+; Copyright (c) Doug Cook.
+;
+; Permission is hereby granted, free of charge, to any person obtaining a copy
+; of this software and associated documentation files (the "Software"), to deal
+; in the Software without restriction, including without limitation the rights
+; to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+; copies of the Software, and to permit persons to whom the Software is
+; furnished to do so, subject to the following conditions:
+;
+; The above copyright notice and this permission notice shall be included in all
+; copies or substantial portions of the Software.
+;
+; THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+; IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+; FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+; AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+; LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+; OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+; SOFTWARE
+
+[Version]
+Signature   = "$WINDOWS NT$"
+Class       = Net
+ClassGuid   = {4d36e972-e325-11ce-bfc1-08002be10318}
+Provider    = %ProviderName%
+PnpLockdown = 1
+DriverVer   = ; will be filled in at build time by StampInf
+CatalogFile = dwc_eqos.cat
+
+[ControlFlags]
+ExcludeFromSelect = *
+
+[SourceDisksNames]
+1 = Disk
+
+[SourceDisksFiles]
+dwc_eqos.sys = 1
+
+[DestinationDirs]
+DefaultDestDir = 12
+
+[Manufacturer]
+; Windows 10 1709 16299: KMDF 1.23; NetAdapterCx 2.0 - NetAdapterCx preview?, no packet filter control.
+; Windows 10 2004 19041: KMDF 1.31; NetAdapterCx 2.0 - MBBCx supported, Ethernet preview, no packet filter control.
+; Windows 10 PRVW 19536: KMDF 1.31; NetAdapterCx 2.1 - Unsupported, adds packet filter control.
+; Windows 11 21H2 22000: KMDF 1.33; NetAdapterCx 2.2 - Ethernet supported, packet filter control supported.
+%RKCP%=DWC,NT$ARCH$.10.0...19536
+
+[DWC.NT$ARCH$.10.0...19536]
+%DWCEQOS.DeviceDesc% = DWCEQOS_Device, ACPI\RKCP6543
+
+[DWCEQOS_Device.NT]
+CopyFiles           = DWCEQOS_CopyFiles
+AddReg              = DWCEQOS_AddReg_Ndi
+AddReg              = DWCEQOS_AddReg_Ndi_params
+FeatureScore        = 0xFE
+Characteristics     = 0x04  ; NCF_PHYSICAL
+BusType             = 15    ; PNPBus
+*IfType             = 6     ; IF_TYPE_ETHERNET_CSMACD
+*MediaType          = 0     ; NdisMedium802_3
+*PhysicalMediaType  = 14    ; NdisPhysicalMedium802_3
+*IfConnectorPresent = 1
+*ConnectionType     = 1     ; NET_IF_CONNECTION_DEDICATED
+*DirectionType      = 0     ; NET_IF_DIRECTION_SENDRECEIVE
+*AccessType         = 2     ; NET_IF_ACCESS_BROADCAST
+*HardwareLoopback   = 0
+
+[DWCEQOS_CopyFiles]
+dwc_eqos.sys
+
+[DWCEQOS_AddReg_Ndi]
+HKR, Ndi, Service, 0, %ServiceName%
+HKR, Ndi\Interfaces, UpperRange, 0, "ndis5"
+HKR, Ndi\Interfaces, LowerRange, 0, "ethernet"
+
+[DWCEQOS_AddReg_Ndi_params]
+HKR, Ndi\params\NetworkAddress, ParamDesc, 0, %NetworkAddress%
+HKR, Ndi\params\NetworkAddress, type,      0, "edit"
+HKR, Ndi\params\NetworkAddress, default,   0, ""
+HKR, Ndi\params\NetworkAddress, LimitText, 0, "12"
+HKR, Ndi\params\NetworkAddress, UpperCase, 0, "1"
+HKR, Ndi\params\NetworkAddress, Optional,  0, "1"
+
+[DWCEQOS_Device.NT.Services]
+AddService = %ServiceName%, 2, DWCEQOS_AddService, DWCEQOS_AddService_EventLog
+
+[DWCEQOS_AddService]
+AddReg         = DWCEQOS_AddService.AddReg
+DisplayName    = %DWCEQOS.ServiceDesc%
+ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
+StartType      = 3               ; SERVICE_DEMAND_START
+ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %12%\dwc_eqos.sys
+
+[DWCEQOS_AddService.AddReg]
+HKR,, BootFlags, 0x10001, 1 ; CM_SERVICE_NETWORK_BOOT_LOAD
+
+[DWCEQOS_AddService_EventLog]
+AddReg = DWCEQOS_AddService_EventLog.AddReg
+
+[DWCEQOS_AddService_EventLog.AddReg]
+HKR,, EventMessageFile, 0x00020000, "%%SystemRoot%%\System32\netevent.dll"
+HKR,, TypesSupported, 0x00010001, 7
+
+[DWCEQOS_Device.NT.Wdf]
+KmdfService = %ServiceName%, DWCEQOS_KmdfService
+
+[DWCEQOS_KmdfService]
+KmdfLibraryVersion = $KMDFVERSION$
+
+[Strings]
+ProviderName = "Open Source"
+NetworkAddress = "Network Address"
+RKCP = "Rockchip"
+DWCEQOS.DeviceDesc = "Synopsys DesignWare Ethernet Quality of Service (GMAC)"
+DWCEQOS.ServiceDesc = "DesignWare Ethernet"
+
+; Not localized
+ServiceName = "dwc_eqos"
