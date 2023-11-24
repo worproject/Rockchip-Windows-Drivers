@@ -1,0 +1,79 @@
+;/*++
+;
+;Copyright (c) CoolStar.  All rights reserved.
+;
+;Module Name:
+;    es8323.inf
+;
+;Abstract:
+;    INF file for installing the Everest 8323 Driver
+;
+;
+;--*/
+
+[Version]
+Signature   = "$WINDOWS NT$"
+Class       = Media
+ClassGuid   = {4d36e96c-e325-11ce-bfc1-08002be10318}
+Provider    = CoolStar
+DriverVer   = 12/16/2021,1.0.0
+CatalogFile = es8323.cat
+PnpLockdown = 1
+
+[DestinationDirs]
+DefaultDestDir = 12
+
+; ================= Class section =====================
+
+[SourceDisksNames]
+1 = %DiskId1%,,,""
+
+[SourceDisksFiles]
+es8323.sys  = 1,,
+
+;*****************************************
+; Es8323  Install Section
+;*****************************************
+
+[Manufacturer]
+%StdMfg%=Standard,NT$ARCH$
+
+; Decorated model section take precedence over undecorated 
+; ones on XP and later.
+[Standard.NT$ARCH$]
+%Es8323.DeviceDesc%=Es8323_Device, ACPI\ESSX8323
+%Es8388.DeviceDesc%=Es8323_Device, ACPI\ESSX8388
+
+[Es8323_Device.NT]
+CopyFiles=Drivers_Dir
+
+[Es8323_Device.NT.HW]
+AddReg=Es8323_AddReg
+
+[Drivers_Dir]
+es8323.sys
+
+[Es8323_AddReg]
+; Set to 1 to connect the first interrupt resource found, 0 to leave disconnected
+HKR,Settings,"ConnectInterrupt",0x00010001,0
+
+;-------------- Service installation
+[Es8323_Device.NT.Services]
+AddService = Es8323,%SPSVCINST_ASSOCSERVICE%, Es8323_Service_Inst
+
+; -------------- Es8323 driver install sections
+[Es8323_Service_Inst]
+DisplayName    = %Es8323.SVCDESC%
+ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
+StartType      = 3               ; SERVICE_DEMAND_START 
+ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %12%\es8323.sys
+LoadOrderGroup = Base
+
+[Strings]
+SPSVCINST_ASSOCSERVICE= 0x00000002
+StdMfg                 = "CoolStar"
+DiskId1                = "Everest 8323 Installation Disk #1"
+Es8323.DeviceDesc = "Everest 8323 I2S Audio"
+Es8388.DeviceDesc = "Everest 8388 I2S Audio"
+Es8323.SVCDESC    = "Everest 8323 Service"

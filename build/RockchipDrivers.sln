@@ -11,6 +11,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "rk3xgpio", "..\drivers\gpio
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "pl330dma", "..\drivers\dma\pl330dma\pl330.vcxproj", "{58434B4F-EE73-4D1E-A78D-9FEC5CEC83C7}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "es8323", "..\drivers\audio\codecs\es8323\es8323.vcxproj", "{15D34676-980D-4406-8C05-AB95AA5B43CA}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|ARM64 = Debug|ARM64
@@ -41,6 +43,12 @@ Global
 		{58434B4F-EE73-4D1E-A78D-9FEC5CEC83C7}.Release|ARM64.ActiveCfg = Release|ARM64
 		{58434B4F-EE73-4D1E-A78D-9FEC5CEC83C7}.Release|ARM64.Build.0 = Release|ARM64
 		{58434B4F-EE73-4D1E-A78D-9FEC5CEC83C7}.Release|ARM64.Deploy.0 = Release|ARM64
+		{15D34676-980D-4406-8C05-AB95AA5B43CA}.Debug|ARM64.ActiveCfg = Debug|ARM64
+		{15D34676-980D-4406-8C05-AB95AA5B43CA}.Debug|ARM64.Build.0 = Debug|ARM64
+		{15D34676-980D-4406-8C05-AB95AA5B43CA}.Debug|ARM64.Deploy.0 = Debug|ARM64
+		{15D34676-980D-4406-8C05-AB95AA5B43CA}.Release|ARM64.ActiveCfg = Release|ARM64
+		{15D34676-980D-4406-8C05-AB95AA5B43CA}.Release|ARM64.Build.0 = Release|ARM64
+		{15D34676-980D-4406-8C05-AB95AA5B43CA}.Release|ARM64.Deploy.0 = Release|ARM64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
