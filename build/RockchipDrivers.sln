@@ -27,6 +27,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "csaudio-Main", "..\drivers\
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "csaudio-Utilities", "..\drivers\audio\csaudiork3x\Source\Utilities\Utilities.vcxproj", "{33E61864-6F2C-4F9F-BE70-8F8985A4F283}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "dwc_eqos", "..\drivers\net\dwc_eqos\dwc_eqos.vcxproj", "{CAD465B6-97D7-402D-85F8-50DE140A6D9D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|ARM64 = Debug|ARM64
@@ -91,6 +93,12 @@ Global
 		{33E61864-6F2C-4F9F-BE70-8F8985A4F283}.Release|ARM64.ActiveCfg = Release|ARM64
 		{33E61864-6F2C-4F9F-BE70-8F8985A4F283}.Release|ARM64.Build.0 = Release|ARM64
 		{33E61864-6F2C-4F9F-BE70-8F8985A4F283}.Release|ARM64.Deploy.0 = Release|ARM64
+		{CAD465B6-97D7-402D-85F8-50DE140A6D9D}.Debug|ARM64.ActiveCfg = Debug|ARM64
+		{CAD465B6-97D7-402D-85F8-50DE140A6D9D}.Debug|ARM64.Build.0 = Debug|ARM64
+		{CAD465B6-97D7-402D-85F8-50DE140A6D9D}.Debug|ARM64.Deploy.0 = Debug|ARM64
+		{CAD465B6-97D7-402D-85F8-50DE140A6D9D}.Release|ARM64.ActiveCfg = Release|ARM64
+		{CAD465B6-97D7-402D-85F8-50DE140A6D9D}.Release|ARM64.Build.0 = Release|ARM64
+		{CAD465B6-97D7-402D-85F8-50DE140A6D9D}.Release|ARM64.Deploy.0 = Release|ARM64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
