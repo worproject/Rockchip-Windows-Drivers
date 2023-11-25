@@ -18,7 +18,7 @@ This repository contains drivers for RK35xx-based platforms, with a focus on RK3
 |DisplayPort output|MSBDD (Inbox)|🟡 Partially working|Single display with mode limited at 1080p 60 Hz, provided by UEFI GOP. Only works in one orientation of the Type-C connector.|
 |HDMI audio||🔴 Not working||
 |DisplayPort audio||🔴 Not working||
-|Analog audio||🔴 Not working||
+|Analog audio|[es8323](https://github.com/worproject/Rockchip-Windows-Drivers/tree/master/drivers/audio/codecs/es8323)|🟢 Working||
 |Digital audio||🔴 Not working||
 |USB/DP Alt Mode||🔴 Not working||
 |GPU||🔴 Not working|Software-rendered|
@@ -26,7 +26,7 @@ This repository contains drivers for RK35xx-based platforms, with a focus on RK3
 |Multimedia codecs||🔴 Not working||
 |DSI||🔴 Not working||
 |CSI||🔴 Not working||
-|GMAC Ethernet||🔴 Not working||
+|GMAC Ethernet|[dwc_eqos](https://github.com/worproject/Rockchip-Windows-Drivers/tree/master/drivers/dwc_eqos)|🟢 Working||
 |UART||🔴 Not working|No OS driver but debugging does work on UART2, being configured by UEFI.|
 |GPIO|[rk3xgpio](https://github.com/worproject/Rockchip-Windows-Drivers/tree/master/drivers/gpio)|🟢 Working||
 |I2C|[rk3xi2c](https://github.com/worproject/Rockchip-Windows-Drivers/tree/master/drivers/i2c)|🟢 Working||
