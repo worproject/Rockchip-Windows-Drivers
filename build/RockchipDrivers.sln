@@ -13,6 +13,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "pl330dma", "..\drivers\dma\
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "es8323", "..\drivers\audio\codecs\es8323\es8323.vcxproj", "{15D34676-980D-4406-8C05-AB95AA5B43CA}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "rk3xi2sbus", "..\drivers\audio\rk3xi2sbus\rk3xi2sbus.vcxproj", "{BA95E25D-392E-4BC9-B481-E4D9FB9AFFB4}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|ARM64 = Debug|ARM64
@@ -49,6 +51,10 @@ Global
 		{15D34676-980D-4406-8C05-AB95AA5B43CA}.Release|ARM64.ActiveCfg = Release|ARM64
 		{15D34676-980D-4406-8C05-AB95AA5B43CA}.Release|ARM64.Build.0 = Release|ARM64
 		{15D34676-980D-4406-8C05-AB95AA5B43CA}.Release|ARM64.Deploy.0 = Release|ARM64
+		{BA95E25D-392E-4BC9-B481-E4D9FB9AFFB4}.Debug|ARM64.ActiveCfg = Debug|ARM64
+		{BA95E25D-392E-4BC9-B481-E4D9FB9AFFB4}.Release|ARM64.ActiveCfg = Release|ARM64
+		{BA95E25D-392E-4BC9-B481-E4D9FB9AFFB4}.Release|ARM64.Build.0 = Release|ARM64
+		{BA95E25D-392E-4BC9-B481-E4D9FB9AFFB4}.Release|ARM64.Deploy.0 = Release|ARM64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

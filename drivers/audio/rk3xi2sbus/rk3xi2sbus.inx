@@ -1,0 +1,88 @@
+;/*++
+;
+;Copyright (c) CoolStar.  All rights reserved.
+;
+;Module Name:
+;    rk3xi2sbus.inf
+;
+;Abstract:
+;    INF file for installing the Rockchip I2S Bus Driver
+;
+;
+;--*/
+
+[Version]
+Signature   = "$WINDOWS NT$"
+Class       = System
+ClassGuid   = {4d36e97d-e325-11ce-bfc1-08002be10318}
+Provider    = CoolStar
+DriverVer   = 8/15/2022,1.0.0
+CatalogFile = rk3xi2sbus.cat
+PnpLockdown = 1
+
+[DestinationDirs]
+DefaultDestDir = 12
+
+; ================= Class section =====================
+
+[SourceDisksNames]
+1 = %DiskId1%,,,""
+
+[SourceDisksFiles]
+rk3xi2sbus.sys  = 1,,
+
+[SignatureAttributes]
+rk3xi2sbus.sys=SignatureAttributes.DRM
+
+[SignatureAttributes.DRM]
+DRMLevel=1300
+
+[SignatureAttributes.PETrust]
+PETrust=true
+
+;*****************************************
+; RK3XI2SBus  Install Section
+;*****************************************
+
+[Manufacturer]
+%StdMfg%=Standard,NT$ARCH$
+
+; Decorated model section take precedence over undecorated 
+; ones on XP and later.
+[Standard.NT$ARCH$]
+%RK3XI2SBus.DeviceDesc%=RK3XI2SBus_Device, ACPI\RKCP3003
+
+[RK3XI2SBus_Device.NT]
+CopyFiles=Drivers_Dir
+
+[RK3XI2SBus_Device.NT.HW]
+AddReg=RK3XI2SBus_AddReg
+Include=pci.inf
+Needs=PciD3ColdSupported.HW
+
+[Drivers_Dir]
+rk3xi2sbus.sys
+
+[RK3XI2SBus_AddReg]
+; Set to 1 to connect the first interrupt resource found, 0 to leave disconnected
+HKR,Settings,"ConnectInterrupt",0x00010001,0
+
+;-------------- Service installation
+[RK3XI2SBus_Device.NT.Services]
+AddService = RK3XI2SBus,%SPSVCINST_ASSOCSERVICE%, RK3XI2SBus_Service_Inst
+
+; -------------- RK3XI2SBus driver install sections
+[RK3XI2SBus_Service_Inst]
+DisplayName    = %RK3XI2SBus.SVCDESC%
+ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
+StartType      = 3               ; SERVICE_DEMAND_START 
+ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %12%\rk3xi2sbus.sys
+LoadOrderGroup = Base
+
+[Strings]
+SPSVCINST_ASSOCSERVICE= 0x00000002
+StdMfg                 = "Rockchip"
+DiskId1                = "Rockchip I2S Bus Installation Disk #1"
+RK3XI2SBus.DeviceDesc = "Rockchip I2S Bus"
+RK3XI2SBus.SVCDESC    = "Rockchip I2S Bus Service"
