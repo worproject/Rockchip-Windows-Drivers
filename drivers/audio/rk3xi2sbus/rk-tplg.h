@@ -1,3 +1,6 @@
+#ifndef _ROCKCHIP_TPLG
+#define _ROCKCHIP_TPLG
+
 #define RKTPLG_MAGIC '$RKC'
 
 typedef struct _RK_TPLG {
@@ -10,3 +13,4 @@ typedef struct _RK_TPLG {
 } RK_TPLG, *PRK_TPLG;
 
 NTSTATUS GetRKTplg(WDFDEVICE FxDevice, RK_TPLG *rkTplg);
+#endif
