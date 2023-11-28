@@ -14,28 +14,25 @@
     <ProjectGuid>{E4DF0EEE-D35B-47F2-A9B1-41EA97C465FF}</ProjectGuid>
     <RootNamespace>$(MSBuildProjectName)</RootNamespace>
     <KMDF_VERSION_MAJOR>1</KMDF_VERSION_MAJOR>
-    <SupportsPackaging>false</SupportsPackaging>
-    <RequiresPackageProject>true</RequiresPackageProject>
     <Configuration Condition="'$(Configuration)' == ''">Debug</Configuration>
     <Platform Condition="'$(Platform)' == ''">Win32</Platform>
     <SampleGuid>{2A9A946E-F017-4E0D-BF75-AD81E7E97D64}</SampleGuid>
     <WindowsTargetPlatformVersion>$(LatestTargetPlatformVersion)</WindowsTargetPlatformVersion>
-    <ProjectName>csaudio-Main</ProjectName>
+    <ProjectName>csaudiork3x</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Label="Configuration">
     <TargetVersion>Windows10</TargetVersion>
-    <UseDebugLibraries>True</UseDebugLibraries>
     <DriverTargetPlatform>Universal</DriverTargetPlatform>
     <DriverType>KMDF</DriverType>
     <PlatformToolset>WindowsKernelModeDriver10.0</PlatformToolset>
     <ConfigurationType>Driver</ConfigurationType>
     <Driver_SpectreMitigation>Spectre</Driver_SpectreMitigation>
   </PropertyGroup>
-  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
-  <PropertyGroup>
-    <OutDir>$(IntDir)</OutDir>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
+    <UseDebugLibraries>true</UseDebugLibraries>
   </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" />
     <Import Project="$(SolutionDir)\common.props" />
