@@ -30,6 +30,12 @@
     <ClCompile Include="dmacontroller.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="insn.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="threads.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="pl330.rc">
@@ -44,6 +50,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="pl330.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="bitops.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="opcodes.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

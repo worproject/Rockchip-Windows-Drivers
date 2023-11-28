@@ -51,7 +51,7 @@
     </ResourceCompile>
     <ClCompile>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(DDK_INC_PATH);..;.</AdditionalIncludeDirectories>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Inc;.</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\Inc;..\..\..\..\include;.</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>%(PreprocessorDefinitions);_USE_WAVERT_;_NEW_DELETE_OPERATORS_</PreprocessorDefinitions>
       <ExceptionHandling>
       </ExceptionHandling>
@@ -83,7 +83,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="adsp.h" />
-    <ClInclude Include="pl330dma.h" />
     <ClInclude Include="rk3x.h" />
     <ClInclude Include="hw.h" />
   </ItemGroup>

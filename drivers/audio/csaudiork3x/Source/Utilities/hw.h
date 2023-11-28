@@ -52,7 +52,7 @@ typedef struct CSAUDIOARG {
 
 #if USERKHW
 #include "rk3x.h"
-#include "pl330dma.h"
+#include <pl330dma.h>
 
 union baseaddr {
     PVOID Base;
