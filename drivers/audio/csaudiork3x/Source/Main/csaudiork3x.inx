@@ -292,24 +292,24 @@ ProviderName = "CoolStar"
 MfgName      = "Rockchip"
 MsCopyRight  = "(C) 2023, CoolStar"
 
-CAAUDIORK3X_SA.DeviceDesc="CoolStar I2S Audio (WDM)"
-CsAudioRk3x.SvcDesc="CoolStar I2S Audio (WDM)"
+CAAUDIORK3X_SA.DeviceDesc="Rockchip I2S Audio (WDM)"
+CsAudioRk3x.SvcDesc="Rockchip I2S Audio (WDM)"
 
 ;; friendly names
-CAAUDIORK3X.WaveSpeaker.szPname="CoolStar Speaker"
-CAAUDIORK3X.TopologySpeaker.szPname="CoolStar Speaker"
+CAAUDIORK3X.WaveSpeaker.szPname="Rockchip Speaker"
+CAAUDIORK3X.TopologySpeaker.szPname="Rockchip Speaker"
 
-CAAUDIORK3X.WaveHeadphones.szPname="CoolStar Headphones"
-CAAUDIORK3X.TopologyHeadphones.szPname="CoolStar Headphones"
+CAAUDIORK3X.WaveHeadphones.szPname="Rockchip Headphones"
+CAAUDIORK3X.TopologyHeadphones.szPname="Rockchip Headphones"
 
-CAAUDIORK3X.WaveHdmi.szPname="CoolStar HDMI"
-CAAUDIORK3X.TopologyHdmi.szPname="CoolStar HDMI"
+CAAUDIORK3X.WaveHdmi.szPname="Rockchip HDMI"
+CAAUDIORK3X.TopologyHdmi.szPname="Rockchip HDMI"
 
-CAAUDIORK3X.WaveMicArray1.szPname="CoolStar Microphone Array - Front"
-CAAUDIORK3X.TopologyMicArray1.szPname="CoolStar Topology Microphone Array - Front"
+CAAUDIORK3X.WaveMicArray1.szPname="Rockchip Microphone Array - Front"
+CAAUDIORK3X.TopologyMicArray1.szPname="Rockchip Topology Microphone Array - Front"
 
-CAAUDIORK3X.WaveMicJack.szPname="CoolStar Microphone"
-CAAUDIORK3X.TopologyMicJack.szPname="CoolStar Topology Microphone"
+CAAUDIORK3X.WaveMicJack.szPname="Rockchip Microphone"
+CAAUDIORK3X.TopologyMicJack.szPname="Rockchip Topology Microphone"
 
 MicArray1CustomName= "Internal Microphone Array - Front"
 
