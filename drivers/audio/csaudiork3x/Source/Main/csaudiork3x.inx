@@ -1,0 +1,315 @@
+[Version]
+Signature   = "$Windows NT$"
+Class       = MEDIA
+Provider    = %ProviderName%
+ClassGUID   = {4d36e96c-e325-11ce-bfc1-08002be10318}
+CatalogFile = csaudiork3x.cat
+PnpLockDown = 1
+
+[SourceDisksNames]
+222="CAAUDIORK3X Driver Disk","",222
+
+[SourceDisksFiles]
+csaudiork3x.sys=222
+
+[SignatureAttributes]
+csaudiork3x.sys=SignatureAttributes.DRM
+
+[SignatureAttributes.DRM]
+DRMLevel=1300
+
+[SignatureAttributes.PETrust]
+PETrust=true
+
+[Manufacturer]
+%MfgName%=CAAUDIORK3X,NT$ARCH$
+
+[CAAUDIORK3X.NT$ARCH$]
+%CAAUDIORK3X_SA.DeviceDesc%=CAAUDIORK3X_SA, CSAUDIO\RK&CLTR
+
+[DestinationDirs]
+CAAUDIORK3X_SA.CopyList=13 ; 13=Package's DriverStore directory
+
+;======================================================
+; CAAUDIORK3X_SA
+;======================================================
+[CAAUDIORK3X_SA.CopyList]
+csaudiork3x.sys
+
+[CAAUDIORK3X_SA.AddReg]
+HKR,,AssociatedFilters,,"wdmaud,swmidi,redbook"
+HKR,,Driver,,csaudiork3x.sys
+
+;
+; For demo only, please review these power management settings for your architecture. 
+;
+HKR,PowerSettings,SingleComponentMultiFxStates,3,1,0,0,0  ; Turn on multi Fx support.
+HKR,PowerSettings,ConservationIdleTime,3,3,0,0,0          ; 3 seconds for idle power management when on battery
+HKR,PowerSettings,PerformanceIdleTime,3,3,0,0,0           ; 3 seconds for idle power management when on AC power
+HKR,PowerSettings,IdlePowerState,3,3,0,0,0                ; go to D3 for idle power management
+
+HKR,Drivers,SubClasses,,"wave,midi,mixer"
+
+HKR,Drivers\wave\wdmaud.drv,Driver,,wdmaud.drv
+HKR,Drivers\midi\wdmaud.drv,Driver,,wdmaud.drv
+HKR,Drivers\mixer\wdmaud.drv,Driver,,wdmaud.drv
+
+HKR,Drivers\wave\wdmaud.drv,Description,,%CAAUDIORK3X_SA.DeviceDesc%
+HKR,Drivers\mixer\wdmaud.drv,Description,,%CAAUDIORK3X_SA.DeviceDesc%
+
+;======================================================
+; capture interfaces: mic array (internal: front)
+;======================================================
+[CAAUDIORK3X.I.WaveMicArray1]
+AddReg=CAAUDIORK3X.I.WaveMicArray1.AddReg
+[CAAUDIORK3X.I.WaveMicArray1.AddReg]
+HKR,,CLSID,,%Proxy.CLSID%
+HKR,,FriendlyName,,%CAAUDIORK3X.WaveMicArray1.szPname%
+
+[CAAUDIORK3X.I.TopologyMicArray1]
+AddReg=CAAUDIORK3X.I.TopologyMicArray1.AddReg
+
+[CAAUDIORK3X.I.TopologyMicArray1.AddReg]
+HKR,,CLSID,,%Proxy.CLSID%
+HKR,,FriendlyName,,%CAAUDIORK3X.TopologyMicArray1.szPname%
+
+HKR,EP\0,%PKEY_AudioEndpoint_Association%,,%KSNODETYPE_ANY%
+
+; The following lines opt-in to pull mode.
+HKR,EP\0,%PKEY_AudioEndpoint_Supports_EventDriven_Mode%,0x00010001,0x1
+
+;======================================================
+; capture interfaces: mic (jack)
+;======================================================
+[CAAUDIORK3X.I.WaveMicJack]
+AddReg=CAAUDIORK3X.I.WaveMicJack.AddReg
+[CAAUDIORK3X.I.WaveMicJack.AddReg]
+HKR,,CLSID,,%Proxy.CLSID%
+HKR,,FriendlyName,,%CAAUDIORK3X.WaveMicJack.szPname%
+
+[CAAUDIORK3X.I.TopologyMicJack]
+AddReg=CAAUDIORK3X.I.TopologyMicJack.AddReg
+
+[CAAUDIORK3X.I.TopologyMicJack.AddReg]
+HKR,,CLSID,,%Proxy.CLSID%
+HKR,,FriendlyName,,%CAAUDIORK3X.TopologyMicJack.szPname%
+
+HKR,EP\0,%PKEY_AudioEndpoint_Association%,,%KSNODETYPE_ANY%
+
+; The following lines opt-in to pull mode.
+HKR,EP\0,%PKEY_AudioEndpoint_Supports_EventDriven_Mode%,0x00010001,0x1
+
+;======================================================
+; render interfaces: speaker (internal)
+;======================================================
+[CAAUDIORK3X.I.WaveSpeaker]
+AddReg=CAAUDIORK3X.I.WaveSpeaker.AddReg
+
+[CAAUDIORK3X.I.WaveSpeaker.AddReg]
+HKR,,CLSID,,%Proxy.CLSID%
+HKR,,FriendlyName,,%CAAUDIORK3X.WaveSpeaker.szPname%
+
+[CAAUDIORK3X.I.TopologySpeaker]
+AddReg=CAAUDIORK3X.I.TopologySpeaker.AddReg
+
+[CAAUDIORK3X.I.TopologySpeaker.AddReg]
+HKR,,CLSID,,%Proxy.CLSID%
+HKR,,FriendlyName,,%CAAUDIORK3X.TopologySpeaker.szPname%
+
+HKR,EP\0,%PKEY_AudioEndpoint_Association%,,%KSNODETYPE_ANY%
+
+; The following lines opt-in to pull mode.
+HKR,EP\0,%PKEY_AudioEndpoint_Supports_EventDriven_Mode%,0x00010001,0x1
+
+
+;======================================================
+; render interfaces: headphones (jack)
+;======================================================
+[CAAUDIORK3X.I.WaveHeadphones]
+AddReg=CAAUDIORK3X.I.WaveHeadphones.AddReg
+
+[CAAUDIORK3X.I.WaveHeadphones.AddReg]
+HKR,,CLSID,,%Proxy.CLSID%
+HKR,,FriendlyName,,%CAAUDIORK3X.WaveHeadphones.szPname%
+
+[CAAUDIORK3X.I.TopologyHeadphones]
+AddReg=CAAUDIORK3X.I.TopologyHeadphones.AddReg
+
+[CAAUDIORK3X.I.TopologyHeadphones.AddReg]
+HKR,,CLSID,,%Proxy.CLSID%
+HKR,,FriendlyName,,%CAAUDIORK3X.TopologyHeadphones.szPname%
+
+HKR,EP\0,%PKEY_AudioEndpoint_Association%,,%KSNODETYPE_ANY%
+
+; The following lines opt-in to pull mode.
+HKR,EP\0,%PKEY_AudioEndpoint_Supports_EventDriven_Mode%,0x00010001,0x1
+
+;======================================================
+; render interfaces: hdmi
+;======================================================
+[CAAUDIORK3X.I.WaveHdmi]
+AddReg=CAAUDIORK3X.I.WaveHdmi.AddReg
+
+[CAAUDIORK3X.I.WaveHdmi.AddReg]
+HKR,,CLSID,,%Proxy.CLSID%
+HKR,,FriendlyName,,%CAAUDIORK3X.WaveHdmi.szPname%
+
+[CAAUDIORK3X.I.TopologyHdmi]
+AddReg=CAAUDIORK3X.I.TopologyHdmi.AddReg
+
+[CAAUDIORK3X.I.TopologyHdmi.AddReg]
+HKR,,CLSID,,%Proxy.CLSID%
+HKR,,FriendlyName,,%CAAUDIORK3X.TopologyHdmi.szPname%
+
+HKR,EP\0,%PKEY_AudioEndpoint_Association%,,%KSNODETYPE_ANY%
+
+; The following lines opt-in to pull mode.
+HKR,EP\0,%PKEY_AudioEndpoint_Supports_EventDriven_Mode%,0x00010001,0x1
+
+;======================================================
+; CAAUDIORK3X_SA
+;======================================================
+[CAAUDIORK3X_SA.NT]
+Include=ks.inf,wdmaudio.inf
+Needs=KS.Registration, WDMAUDIO.Registration
+CopyFiles=CAAUDIORK3X_SA.CopyList
+AddReg=CAAUDIORK3X_SA.AddReg
+
+[CAAUDIORK3X_SA.NT.Interfaces]
+;
+; Interfaces for speaker (internal) render endpoint.
+;
+AddInterface=%KSCATEGORY_AUDIO%, %KSNAME_WaveSpeaker%, CAAUDIORK3X.I.WaveSpeaker
+AddInterface=%KSCATEGORY_RENDER%, %KSNAME_WaveSpeaker%, CAAUDIORK3X.I.WaveSpeaker
+AddInterface=%KSCATEGORY_REALTIME%, %KSNAME_WaveSpeaker%, CAAUDIORK3X.I.WaveSpeaker
+AddInterface=%KSCATEGORY_AUDIO%, %KSNAME_TopologySpeaker%, CAAUDIORK3X.I.TopologySpeaker
+AddInterface=%KSCATEGORY_TOPOLOGY%, %KSNAME_TopologySpeaker%, CAAUDIORK3X.I.TopologySpeaker
+
+;
+; Interfaces for headphone (internal) render endpoint.
+;
+AddInterface=%KSCATEGORY_AUDIO%, %KSNAME_WaveHeadphones%, CAAUDIORK3X.I.WaveHeadphones
+AddInterface=%KSCATEGORY_RENDER%, %KSNAME_WaveHeadphones%, CAAUDIORK3X.I.WaveHeadphones
+AddInterface=%KSCATEGORY_REALTIME%, %KSNAME_WaveHeadphones%, CAAUDIORK3X.I.WaveHeadphones
+AddInterface=%KSCATEGORY_AUDIO%, %KSNAME_TopologyHeadphones%, CAAUDIORK3X.I.TopologyHeadphones
+AddInterface=%KSCATEGORY_TOPOLOGY%, %KSNAME_TopologyHeadphones%, CAAUDIORK3X.I.TopologyHeadphones
+
+;
+; Interfaces for hdmi render endpoint.
+;
+AddInterface=%KSCATEGORY_AUDIO%, %KSNAME_WaveHdmi%, CAAUDIORK3X.I.WaveHdmi
+AddInterface=%KSCATEGORY_RENDER%, %KSNAME_WaveHdmi%, CAAUDIORK3X.I.WaveHdmi
+AddInterface=%KSCATEGORY_REALTIME%, %KSNAME_WaveHdmi%, CAAUDIORK3X.I.WaveHdmi
+AddInterface=%KSCATEGORY_AUDIO%, %KSNAME_TopologyHdmi%, CAAUDIORK3X.I.TopologyHdmi
+AddInterface=%KSCATEGORY_TOPOLOGY%, %KSNAME_TopologyHdmi%, CAAUDIORK3X.I.TopologyHdmi
+
+;
+; Interfaces for microphone array 1 (internal: front) capture endpoint.
+;
+AddInterface=%KSCATEGORY_AUDIO%,    %KSNAME_WaveMicArray1%, CAAUDIORK3X.I.WaveMicArray1
+AddInterface=%KSCATEGORY_REALTIME%, %KSNAME_WaveMicArray1%, CAAUDIORK3X.I.WaveMicArray1
+AddInterface=%KSCATEGORY_CAPTURE%,  %KSNAME_WaveMicArray1%, CAAUDIORK3X.I.WaveMicArray1
+AddInterface=%KSCATEGORY_AUDIO%,    %KSNAME_TopologyMicArray1%, CAAUDIORK3X.I.TopologyMicArray1
+AddInterface=%KSCATEGORY_TOPOLOGY%, %KSNAME_TopologyMicArray1%, CAAUDIORK3X.I.TopologyMicArray1
+
+;
+; Interfaces for microphone array 1 (internal: front) capture endpoint.
+;
+AddInterface=%KSCATEGORY_AUDIO%,    %KSNAME_WaveMicJack%, CAAUDIORK3X.I.WaveMicJack
+AddInterface=%KSCATEGORY_REALTIME%, %KSNAME_WaveMicJack%, CAAUDIORK3X.I.WaveMicJack
+AddInterface=%KSCATEGORY_CAPTURE%,  %KSNAME_WaveMicJack%, CAAUDIORK3X.I.WaveMicJack
+AddInterface=%KSCATEGORY_AUDIO%,    %KSNAME_TopologyMicJack%, CAAUDIORK3X.I.TopologyMicJack
+AddInterface=%KSCATEGORY_TOPOLOGY%, %KSNAME_TopologyMicJack%, CAAUDIORK3X.I.TopologyMicJack
+
+[CAAUDIORK3X_SA.NT.Services]
+AddService=CsAudioRk3x,0x00000002,CsAudioRk3x_Service_Inst
+
+[CsAudioRk3x_Service_Inst]
+DisplayName=%CsAudioRk3x.SvcDesc%
+ServiceType=1
+StartType=3
+ErrorControl=1
+ServiceBinary=%13%\csaudiork3x.sys
+
+[CAAUDIORK3X_SA.NT.HW]
+AddReg = AUDIOHW.AddReg
+
+[AUDIOHW.AddReg]
+; FILE_DEVICE_SOUND
+HKR,,DeviceType,0x10001,0x0000001D
+; SDDL_DEVOBJ_SYS_ALL_ADM_RWX_WORLD_RWX_RES_RWX
+HKR,,Security,,"D:P(A;;GA;;;SY)(A;;GRGWGX;;;BA)(A;;GRGWGX;;;WD)(A;;GRGWGX;;;RC)"
+
+
+;======================================================
+; WDF
+;======================================================
+[CAAUDIORK3X_SA.NT.Wdf]
+KmdfService = CsAudioRk3x, CAAUDIORK3X_SA_WdfSect
+[CAAUDIORK3X_SA_WdfSect]
+KmdfLibraryVersion = $KMDFVERSION$
+
+;======================================================
+; COMMON
+;======================================================
+[Strings]
+
+;Non-localizable
+
+KSNAME_WaveSpeaker="WaveSpeaker"
+KSNAME_TopologySpeaker="TopologySpeaker"
+
+KSNAME_WaveHeadphones="WaveHeadphones"
+KSNAME_TopologyHeadphones="TopologyHeadphones"
+
+KSNAME_WaveHdmi="WaveHdmi"
+KSNAME_TopologyHdmi="TopologyHdmi"
+
+KSNAME_WaveMicArray1="WaveMicArray1"
+KSNAME_TopologyMicArray1="TopologyMicArray1"
+
+KSNAME_WaveMicJack="WaveMicJack"
+KSNAME_TopologyMicJack="TopologyMicJack"
+
+Proxy.CLSID="{17CCA71B-ECD7-11D0-B908-00A0C9223196}"
+KSCATEGORY_AUDIO="{6994AD04-93EF-11D0-A3CC-00A0C9223196}"
+KSCATEGORY_RENDER="{65E8773E-8F56-11D0-A3B9-00A0C9223196}"
+KSCATEGORY_CAPTURE="{65E8773D-8F56-11D0-A3B9-00A0C9223196}"
+KSCATEGORY_REALTIME ="{EB115FFC-10C8-4964-831D-6DCB02E6F23F}"
+KSCATEGORY_TOPOLOGY = "{DDA54A40-1E4C-11D1-A050-405705C10000}"
+
+KSNODETYPE_ANY   = "{00000000-0000-0000-0000-000000000000}"
+
+PKEY_AudioEndpoint_Association               = "{1DA5D803-D492-4EDD-8C23-E0C0FFEE7F0E},2"
+PKEY_AudioEndpoint_Supports_EventDriven_Mode = "{1DA5D803-D492-4EDD-8C23-E0C0FFEE7F0E},7"
+
+MEDIA_CATEGORIES = "MediaCategories"
+MicArray1CustomNameGUID = {6ae81ff4-203e-4fe1-88aa-f2d57775cd4a}
+
+;Localizable
+
+ProviderName = "CoolStar"
+MfgName      = "Rockchip"
+MsCopyRight  = "(C) 2023, CoolStar"
+
+CAAUDIORK3X_SA.DeviceDesc="CoolStar I2S Audio (WDM)"
+CsAudioRk3x.SvcDesc="CoolStar I2S Audio (WDM)"
+
+;; friendly names
+CAAUDIORK3X.WaveSpeaker.szPname="CoolStar Speaker"
+CAAUDIORK3X.TopologySpeaker.szPname="CoolStar Speaker"
+
+CAAUDIORK3X.WaveHeadphones.szPname="CoolStar Headphones"
+CAAUDIORK3X.TopologyHeadphones.szPname="CoolStar Headphones"
+
+CAAUDIORK3X.WaveHdmi.szPname="CoolStar HDMI"
+CAAUDIORK3X.TopologyHdmi.szPname="CoolStar HDMI"
+
+CAAUDIORK3X.WaveMicArray1.szPname="CoolStar Microphone Array - Front"
+CAAUDIORK3X.TopologyMicArray1.szPname="CoolStar Topology Microphone Array - Front"
+
+CAAUDIORK3X.WaveMicJack.szPname="CoolStar Microphone"
+CAAUDIORK3X.TopologyMicJack.szPname="CoolStar Topology Microphone"
+
+MicArray1CustomName= "Internal Microphone Array - Front"
+
