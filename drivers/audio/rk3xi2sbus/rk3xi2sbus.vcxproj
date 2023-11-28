@@ -53,10 +53,10 @@
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
     <ClCompile>
-      <WppEnabled>true</WppEnabled>
       <WppScanConfigurationData Condition="'%(ClCompile. ScanConfigurationData)'  == ''">trace.h</WppScanConfigurationData>
       <WppKernelMode>true</WppKernelMode>
       <TreatWarningAsError>false</TreatWarningAsError>
+      <WppEnabled>false</WppEnabled>
     </ClCompile>
     <Inf>
       <TimeStamp>1.0.0</TimeStamp>
@@ -67,10 +67,10 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
     <ClCompile>
-      <WppEnabled>true</WppEnabled>
       <WppScanConfigurationData Condition="'%(ClCompile. ScanConfigurationData)'  == ''">trace.h</WppScanConfigurationData>
       <WppKernelMode>true</WppKernelMode>
       <TreatWarningAsError>false</TreatWarningAsError>
+      <WppEnabled>false</WppEnabled>
     </ClCompile>
     <Inf>
       <TimeStamp>1.0.0</TimeStamp>
