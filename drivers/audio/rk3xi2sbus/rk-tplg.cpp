@@ -137,20 +137,22 @@ GetRKTplg(
 
 		status = STATUS_SUCCESS;
 
+#define CHECK_STR(dsdParameter, str) (dsdParameter->DataLength >= strlen(str) && strncmp((const char *)&dsdParameter->Data[0], str, dsdParameter->DataLength) == 0)
+
 		FOR_EACH_ACPI_METHOD_ARGUMENT(dsdParameter, (PACPI_METHOD_ARGUMENT)packageArg->Data, (PACPI_METHOD_ARGUMENT)(packageArg->Data + packageArg->DataLength)) {
 			PACPI_METHOD_ARGUMENT dsdParameterName = (PACPI_METHOD_ARGUMENT)dsdParameter->Data;
 			PACPI_METHOD_ARGUMENT dsdParameterData = ACPI_METHOD_NEXT_ARGUMENT(dsdParameterName);
 
-			if (strncmp((const char*)&dsdParameterName->Data[0], "rockchip,dma", dsdParameterName->DataLength) == 0) {
+			if (CHECK_STR(dsdParameterName, "rockchip,dma")) {
 				copyDSDParam(dsdParameterData, (char **)&rkTplg->dma_name);
 			}
-			else if (strncmp((const char*)&dsdParameterName->Data[0], "rockchip,tplg", dsdParameterName->DataLength) == 0) {
+			else if (CHECK_STR(dsdParameterName, "rockchip,tplg")) {
 				copyDSDParam(dsdParameterData, (char**)&rkTplg->audio_tplg);
 			}
-			else if (strncmp((const char*)&dsdParameterName->Data[0], "rockchip,tx", dsdParameterName->DataLength) == 0) {
+			else if (CHECK_STR(dsdParameterName, "rockchip,tx")) {
 				copyDSDParamNum(dsdParameterData, &rkTplg->tx);
 			}
-			else if (strncmp((const char*)&dsdParameterName->Data[0], "rockchip,rx", dsdParameterName->DataLength) == 0) {
+			else if (CHECK_STR(dsdParameterName, "rockchip,rx")) {
 				copyDSDParamNum(dsdParameterData, &rkTplg->rx);
 			}
 		}
