@@ -263,7 +263,8 @@ NTSTATUS SubmitAudioDMA(
 	ccr |= ((maxBurst - 1) << CC_SRCBRSTLEN_SHFT);
 	ccr |= ((maxBurst - 1) << CC_DSTBRSTLEN_SHFT);
 
-	UINT32 burstSz = __ffs(addrWidth); //bus width = 4 bytes
+	ULONG burstSz = 0;
+	_BitScanForward(&burstSz, addrWidth);
 	ccr |= (burstSz << CC_SRCBRSTSIZE_SHFT);
 	ccr |= (burstSz << CC_DSTBRSTSIZE_SHFT);
 	ccr |= (CCTRL0 << CC_SRCCCTRL_SHFT);
