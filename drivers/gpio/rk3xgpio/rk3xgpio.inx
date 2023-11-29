@@ -16,7 +16,6 @@ Signature   = "$WINDOWS NT$"
 Class       = System
 ClassGuid   = {4d36e97d-e325-11ce-bfc1-08002be10318}
 Provider    = CoolStar
-DriverVer   = 6/30/2023,1.0.0
 CatalogFile = rk3xgpio.cat
 PnpLockdown = 1
 

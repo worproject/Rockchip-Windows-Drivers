@@ -16,7 +16,6 @@ Signature   = "$WINDOWS NT$"
 Class       = System
 ClassGuid   = {4d36e97d-e325-11ce-bfc1-08002be10318}
 Provider    = CoolStar
-DriverVer   = 8/15/2022,1.0.0
 CatalogFile = rk3xi2sbus.cat
 PnpLockdown = 1
 
