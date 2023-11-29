@@ -46,9 +46,6 @@
     <ClInclude Include="driver.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="trace.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="pl330.h">
       <Filter>Header Files</Filter>
     </ClInclude>
