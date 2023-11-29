@@ -52,9 +52,6 @@
     <ClInclude Include="pl330.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="bitops.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="opcodes.h">
       <Filter>Header Files</Filter>
     </ClInclude>

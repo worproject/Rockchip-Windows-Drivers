@@ -95,7 +95,6 @@
     <FilesToPackage Include="@(Inf->'%(CopyOutput)')" Condition="'@(Inf)'!=''" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="bitops.h" />
     <ClInclude Include="driver.h" />
     <ClInclude Include="opcodes.h" />
     <ClInclude Include="pl330.h" />

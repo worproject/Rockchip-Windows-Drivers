@@ -15,7 +15,6 @@
 #include <wdf.h>
 #include <acpiioct.h>
 
-#include "bitops.h"
 #include "pl330.h"
 #include <pl330dma.h>
 
