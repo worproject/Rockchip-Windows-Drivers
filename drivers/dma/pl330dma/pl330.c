@@ -15,11 +15,11 @@ void udelay(ULONG usec) {
 
 UINT32 read32(PPL330DMA_CONTEXT pDevice, UINT32 reg)
 {
-	return *(UINT32 *)((CHAR *)pDevice->MMIOAddress + reg);
+	return READ_REGISTER_NOFENCE_ULONG((ULONG *)((CHAR*)pDevice->MMIOAddress + reg));
 }
 
 void write32(PPL330DMA_CONTEXT pDevice, UINT32 reg, UINT32 val) {
-	*(UINT32 *)((CHAR *)pDevice->MMIOAddress + reg) = val;
+	WRITE_REGISTER_NOFENCE_ULONG((ULONG *)((CHAR*)pDevice->MMIOAddress + reg), val);
 }
 
 NTSTATUS
