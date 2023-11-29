@@ -222,7 +222,7 @@ enum pl330_byteswap {
 #define MCODE_BUFF_PER_REQ	256
 
 /* Use this _only_ to wait on transient states */
-#define UNTIL(t, s) while (!(_state(t) & (s))) __yield();
+#define UNTIL(t, s) while (!(_state(t) & (s))) YieldProcessor();
 
  /* The number of default descriptors */
 
