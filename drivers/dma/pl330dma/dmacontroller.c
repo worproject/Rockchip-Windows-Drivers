@@ -120,7 +120,7 @@ static NTSTATUS UntilDmacIdle(PPL330DMA_THREAD Thread)
 		if (!(read32(pDevice, DBGSTATUS) & DBG_BUSY))
 			return STATUS_SUCCESS;
 
-		__yield();
+		YieldProcessor();
 
 		LARGE_INTEGER CurrentTime;
 		KeQuerySystemTimePrecise(&CurrentTime);
