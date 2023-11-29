@@ -4,22 +4,24 @@ static ULONG Pl330DmaDebugLevel = 100;
 static ULONG Pl330DmaDebugCatagories = DBG_INIT || DBG_PNP || DBG_IOCTL;
 
 void ReadDmacConfiguration(PPL330DMA_CONTEXT pDevice) {
+	const UINT32 crd = read32(pDevice, CRD);
+	const UINT32 cr0 = read32(pDevice, CR0);
 	UINT32 val;
 
-	val = read32(pDevice, CRD) >> CRD_DATA_WIDTH_SHIFT;
+	val = crd >> CRD_DATA_WIDTH_SHIFT;
 	val &= CRD_DATA_WIDTH_MASK;
 	pDevice->Config.DataBusWidth = 8 * (1 << val);
 
-	val = read32(pDevice, CRD) >> CRD_DATA_BUFF_SHIFT;
+	val = crd >> CRD_DATA_BUFF_SHIFT;
 	val &= CRD_DATA_BUFF_MASK;
 	pDevice->Config.DataBufDepth = val + 1;
 
-	val = read32(pDevice, CRD) >> CR0_NUM_CHANS_SHIFT;
+	val = crd >> CR0_NUM_CHANS_SHIFT;
 	val &= CR0_NUM_CHANS_MASK;
 	val += 1;
 	pDevice->Config.NumChan = val;
 
-	val = read32(pDevice, CR0);
+	val = cr0;
 	if (val & CR0_PERIPH_REQ_SET) {
 		val = (val >> CR0_NUM_PERIPH_SHIFT) & CR0_NUM_PERIPH_MASK;
 		val += 1;
@@ -30,13 +32,13 @@ void ReadDmacConfiguration(PPL330DMA_CONTEXT pDevice) {
 		pDevice->Config.NumPeripherals = 0;
 	}
 
-	val = read32(pDevice, CR0);
+	val = cr0;
 	if (val & CR0_BOOT_MAN_NS)
 		pDevice->Config.Mode |= DMAC_MODE_NS;
 	else
 		pDevice->Config.Mode &= ~DMAC_MODE_NS;
 
-	val = read32(pDevice, CR0) >> CR0_NUM_EVENTS_SHIFT;
+	val = cr0 >> CR0_NUM_EVENTS_SHIFT;
 	val &= CR0_NUM_EVENTS_MASK;
 	val += 1;
 	pDevice->Config.NumEvents = val;
