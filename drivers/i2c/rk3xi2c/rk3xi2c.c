@@ -9,11 +9,11 @@ static ULONG Rk3xI2CDebugCatagories = DBG_INIT || DBG_PNP || DBG_IOCTL;
 
 UINT32 read32(PRK3XI2C_CONTEXT pDevice, UINT32 reg)
 {
-	return *(UINT32 *)((CHAR *)pDevice->MMIOAddress + reg);
+	return READ_REGISTER_NOFENCE_ULONG((ULONG *)((CHAR*)pDevice->MMIOAddress + reg));
 }
 
 void write32(PRK3XI2C_CONTEXT pDevice, UINT32 reg, UINT32 val) {
-	*(UINT32 *)((CHAR *)pDevice->MMIOAddress + reg) = val;
+	WRITE_REGISTER_NOFENCE_ULONG((ULONG *)((CHAR*)pDevice->MMIOAddress + reg), val);
 }
 
 NTSTATUS

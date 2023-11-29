@@ -185,11 +185,11 @@ typedef struct _SIM_GPIO_CONTEXT {
 
 UINT32 read32(PROCKCHIP_GPIO_BANK pBank, UINT32 reg)
 {
-    return *(UINT32*)((CHAR*)pBank->VirtualBaseAddress + reg);
+    return READ_REGISTER_NOFENCE_ULONG((ULONG *)((CHAR*)pBank->VirtualBaseAddress + reg));
 }
 
 void write32(PROCKCHIP_GPIO_BANK pBank, UINT32 reg, UINT32 val) {
-    *(UINT32*)((CHAR*)pBank->VirtualBaseAddress + reg) = val;
+    WRITE_REGISTER_NOFENCE_ULONG((ULONG *)((CHAR*)pBank->VirtualBaseAddress + reg), val);
 }
 
 void gpio_write32_v2(PROCKCHIP_GPIO_BANK pBank, UINT32 reg, UINT32 val) {

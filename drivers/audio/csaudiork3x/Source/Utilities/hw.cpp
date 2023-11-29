@@ -103,13 +103,13 @@ CCsAudioRk3xHW::~CCsAudioRk3xHW() {
 
 #if USERKHW
 static UINT32 read32(PVOID addr) {
-    UINT32 ret = *(UINT32*)addr;
+    UINT32 ret = READ_REGISTER_NOFENCE_ULONG((ULONG *)addr);
     //DbgPrint("Read from %p: 0x%x\n", addr, ret);
     return ret;
 }
 
 static void write32(PVOID addr, UINT32 data) {
-    *(UINT32*)addr = data;
+    WRITE_REGISTER_NOFENCE_ULONG((ULONG *)addr, data);
     //DbgPrint("Write to %p: 0x%x\n", addr, data);
 }
 
