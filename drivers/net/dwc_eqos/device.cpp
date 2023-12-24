@@ -24,16 +24,19 @@ static auto constexpr DefaultAxiMaxWriteOutstanding = 4u;
 static auto constexpr DefaultAxiMaxReadOutstanding = 8u;
 static auto constexpr DefaultCsrRate = 125'000'000u;
 static auto constexpr BusBytes = 8u;
-static auto constexpr LinkStatusBit = 0x80000000u;
+static auto constexpr QueuesSupported = 1u; // TODO: Support multiple queues.
+static auto constexpr InterruptLinkStatus = 0x80000000u;
+static auto constexpr InterruptChannel0Status = ~InterruptLinkStatus;
 
-enum InterruptsWanted : char
+enum InterruptsWanted : UCHAR
 {
     InterruptsNone  = 0,
     InterruptsState = 1 << 0, // mac.LinkStatus, ch0.AbnormalInterruptSummary, ch0.FatalBusError
     InterruptsRx    = 1 << 1, // ch0.Rx
     InterruptsTx    = 1 << 2, // ch0.Tx
-    InterruptsAll   = -1,
+    InterruptsAll   = static_cast<InterruptsWanted>(-1),
 };
+DEFINE_ENUM_FLAG_OPERATORS(InterruptsWanted);
 
 struct DeviceContext
 {
@@ -41,7 +44,7 @@ struct DeviceContext
 
     MacRegisters* regs;
     NETADAPTER adapter;
-    WDFSPINLOCK lock;
+    WDFSPINLOCK queueLock;
     WDFINTERRUPT interrupt;
     WDFDMAENABLER dma;
     MacHwFeature0_t feature0;
@@ -53,11 +56,11 @@ struct DeviceContext
 
     // Mutable.
 
-    LONG interruptStatus; // = ChannelStatus_t, plus top bit is LinkStatus. Interlocked update.
+    ChannelStatus_t interruptStatus; // Channel0 + InterruptLinkStatus. Interlocked update.
 
-    InterruptsWanted interruptsWanted;  // Guarded by lock.
-    NETPACKETQUEUE rxQueue;             // Guarded by lock.
-    NETPACKETQUEUE txQueue;             // Guarded by lock.
+    InterruptsWanted interruptsWanted;  // Guarded by interrupt lock.
+    NETPACKETQUEUE rxQueue;             // Guarded by queueLock.
+    NETPACKETQUEUE txQueue;             // Guarded by queueLock.
 
     // Diagnostics/statistics.
 
@@ -113,8 +116,7 @@ DeviceReset(_Inout_ MacRegisters* regs, _In_reads_(6) UINT8 const* mac0)
 
     Write32(&regs->DmaMode, 1); // Software reset.
 
-    unsigned retry;
-    for (retry = 1000u; retry != 0; retry -= 1)
+    for (unsigned retry = 0; retry != 1000; retry -= 1)
     {
         KeStallExecutionProcessor(20);
         auto const dmaMode = Read32(&regs->DmaMode);
@@ -189,41 +191,56 @@ UpdateLinkState(_In_ DeviceContext const* context)
 // Cleared by reading MacPhyIfControlStatus.
 _IRQL_requires_max_(HIGH_LEVEL)
 static MacInterruptEnable_t
-MakeMacInterruptEnable(char interruptsWanted)
+MakeMacInterruptEnable(InterruptsWanted wanted)
 {
     // HIGH_LEVEL
     MacInterruptEnable_t interruptEnable = {};
-    interruptEnable.LinkStatus = 0 != (interruptsWanted & InterruptsState);
+    interruptEnable.LinkStatus = 0 != (wanted & InterruptsState);
     return interruptEnable;
 }
 
 // Cleared by writing Channel.Status.
 _IRQL_requires_max_(HIGH_LEVEL)
 static ChannelInterruptEnable_t
-MakeChannelInterruptEnable(char interruptsWanted)
+MakeChannelInterruptEnable(InterruptsWanted wanted)
 {
     // HIGH_LEVEL
     ChannelInterruptEnable_t interruptEnable = {};
-    interruptEnable.Rx = 0 != (interruptsWanted & InterruptsRx);
-    interruptEnable.Tx = 0 != (interruptsWanted & InterruptsTx);
+    interruptEnable.Rx = 0 != (wanted & InterruptsRx);
+    interruptEnable.Tx = 0 != (wanted & InterruptsTx);
     interruptEnable.NormalInterruptSummary = 1;
-    interruptEnable.FatalBusError = 0 != (interruptsWanted & InterruptsState);
-    interruptEnable.AbnormalInterruptSummary = 0 != (interruptsWanted & InterruptsState);
+    interruptEnable.FatalBusError = 0 != (wanted & InterruptsState);
+    interruptEnable.AbnormalInterruptSummary = 0 != (wanted & InterruptsState);
     return interruptEnable;
 }
 
-_IRQL_requires_(DISPATCH_LEVEL)
+_IRQL_requires_min_(DISPATCH_LEVEL) // Actually HIGH_LEVEL.
 static void
-DeviceInterruptEnable_Locked(_Inout_ DeviceContext* context, InterruptsWanted bitsToEnable)
+DeviceInterruptSet_Locked(_Inout_ MacRegisters* regs, InterruptsWanted wanted)
+{
+    // HIGH_LEVEL
+    Write32(&regs->MacInterruptEnable, MakeMacInterruptEnable(wanted));
+    Write32(&regs->DmaCh[0].InterruptEnable, MakeChannelInterruptEnable(wanted));
+}
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+static void
+DeviceInterruptEnable(_Inout_ DeviceContext* context, InterruptsWanted bitsToEnable)
 {
     // DISPATCH_LEVEL
+
+    WdfInterruptAcquireLock(context->interrupt); // DISPATCH_LEVEL --> HIGH_LEVEL
     auto const oldWanted = context->interruptsWanted;
     auto const newWanted = static_cast<InterruptsWanted>(oldWanted | bitsToEnable);
     if (oldWanted != newWanted)
     {
         context->interruptsWanted = newWanted;
-        Write32(&context->regs->MacInterruptEnable, MakeMacInterruptEnable(newWanted));
-        Write32(&context->regs->DmaCh[0].InterruptEnable, MakeChannelInterruptEnable(newWanted));
+        DeviceInterruptSet_Locked(context->regs, newWanted);
+    }
+    WdfInterruptReleaseLock(context->interrupt); // HIGH_LEVEL --> DISPATCH_LEVEL
+
+    if (oldWanted != newWanted)
+    {
         TraceEntryExit(DeviceInterruptEnable, LEVEL_VERBOSE,
             TraceLoggingHexInt32(oldWanted, "old"),
             TraceLoggingHexInt32(newWanted, "new"));
@@ -232,40 +249,26 @@ DeviceInterruptEnable_Locked(_Inout_ DeviceContext* context, InterruptsWanted bi
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 static void
-DeviceInterruptEnable(_Inout_ DeviceContext* context, InterruptsWanted bitsToEnable)
+DeviceInterruptDisable(_Inout_ DeviceContext* context, InterruptsWanted bitsToDisable)
 {
     // DISPATCH_LEVEL
-    WdfSpinLockAcquire(context->lock);
-    DeviceInterruptEnable_Locked(context, bitsToEnable);
-    WdfSpinLockRelease(context->lock);
-}
 
-_IRQL_requires_(DISPATCH_LEVEL)
-static void
-DeviceInterruptDisable_Locked(_Inout_ DeviceContext* context, InterruptsWanted bitsToDisable)
-{
-    // DISPATCH_LEVEL
+    WdfInterruptAcquireLock(context->interrupt); // DISPATCH_LEVEL --> HIGH_LEVEL
     auto const oldWanted = context->interruptsWanted;
     auto const newWanted = static_cast<InterruptsWanted>(oldWanted & ~bitsToDisable);
     if (oldWanted != newWanted)
     {
         context->interruptsWanted = newWanted;
-        Write32(&context->regs->MacInterruptEnable, MakeMacInterruptEnable(newWanted));
-        Write32(&context->regs->DmaCh[0].InterruptEnable, MakeChannelInterruptEnable(newWanted));
+        DeviceInterruptSet_Locked(context->regs, newWanted);
+    }
+    WdfInterruptReleaseLock(context->interrupt); // HIGH_LEVEL --> DISPATCH_LEVEL
+
+    if (oldWanted != newWanted)
+    {
         TraceWrite("DeviceInterruptDisable", LEVEL_VERBOSE,
             TraceLoggingHexInt32(oldWanted, "old"),
             TraceLoggingHexInt32(newWanted, "new"));
     }
-}
-
-_IRQL_requires_max_(DISPATCH_LEVEL)
-static void
-DeviceInterruptDisable(_Inout_ DeviceContext* context, InterruptsWanted bitsToEnable)
-{
-    // DISPATCH_LEVEL
-    WdfSpinLockAcquire(context->lock);
-    DeviceInterruptDisable_Locked(context, bitsToEnable);
-    WdfSpinLockRelease(context->lock);
 }
 
 static EVT_WDF_INTERRUPT_ISR DeviceInterruptIsr;
@@ -277,24 +280,39 @@ DeviceInterruptIsr(
     // HIGH_LEVEL
     UNREFERENCED_PARAMETER(messageId);
     auto const context = DeviceGetContext(WdfInterruptGetDevice(interrupt));
+    auto const regs = context->regs;
 
-    auto const mac = Read32(&context->regs->MacInterruptStatus);
-    auto const channel0 = Read32(&context->regs->DmaCh[0].Status);
-    if (mac.LinkStatus || channel0.Value32 != 0)
+    ChannelStatus_t newInterruptStatus = {};
+
+    auto const mac = Read32(&regs->MacInterruptStatus);
+    if (mac.LinkStatus)
     {
-        if (mac.LinkStatus)
+        newInterruptStatus.Value32 |= InterruptLinkStatus;
+        (void)Read32(&regs->MacPhyIfControlStatus); // Clears interrupt status.
+    }
+
+    auto const channel0 = Read32(&regs->DmaCh[0].Status);
+    newInterruptStatus.Value32 |= channel0.Value32 & InterruptChannel0Status;
+
+    if (newInterruptStatus.Value32 != 0)
+    {
+        Write32(&regs->DmaCh[0].Status, channel0); // Clears DmaCh0.Status.
+
+        // Disable interrupts until DPC runs.
+        DeviceInterruptSet_Locked(regs, InterruptsNone); // Interrupt lock is already held.
+
+        if (newInterruptStatus.Rx)
         {
-            Read32(&context->regs->MacPhyIfControlStatus); // Clears LinkStatus.
+            context->interruptsWanted &= ~InterruptsRx;
         }
 
-        if (channel0.Value32 != 0)
+        if (newInterruptStatus.Tx)
         {
-            Write32(&context->regs->DmaCh[0].Status, channel0); // Clears DmaCh0.Status.
+            context->interruptsWanted &= ~InterruptsTx;
         }
 
-        InterlockedOrNoFence(
-            &context->interruptStatus,
-            channel0.Value32 | (mac.LinkStatus ? LinkStatusBit : 0u));
+        static_assert(sizeof(long) == sizeof(context->interruptStatus));
+        InterlockedOrNoFence(reinterpret_cast<long*>(&context->interruptStatus), newInterruptStatus.Value32);
         WdfInterruptQueueDpcForIsr(interrupt);
 
         context->isrHandled += 1;
@@ -318,57 +336,64 @@ DeviceInterruptDpc(
 
     for (;;)
     {
-        ChannelStatus_t const status{ (ULONG)InterlockedExchangeNoFence(&context->interruptStatus, 0) };
-        if (status.Value32 == 0)
+        static_assert(sizeof(long) == sizeof(context->interruptStatus));
+        auto const newInterruptStatus =
+            ChannelStatus_t(InterlockedExchangeNoFence(reinterpret_cast<long*>(&context->interruptStatus), 0));
+        if (newInterruptStatus.Value32 == 0)
         {
             break;
         }
 
-        if (status.AbnormalInterruptSummary || status.FatalBusError)
+        if (newInterruptStatus.Value32 & InterruptLinkStatus)
+        {
+            context->dpcLinkState += 1;
+            UpdateLinkState(context); // Clears LinkStatus interrupt.
+        }
+
+        if (newInterruptStatus.Rx || newInterruptStatus.Tx)
+        {
+            WdfSpinLockAcquire(context->queueLock);
+
+            auto const rxQueue = context->rxQueue;
+            if (rxQueue && newInterruptStatus.Rx)
+            {
+                context->dpcRx += 1;
+                NetRxQueueNotifyMoreReceivedPacketsAvailable(rxQueue);
+                context->rxQueue = nullptr;
+            }
+
+            auto const txQueue = context->txQueue;
+            if (txQueue && newInterruptStatus.Tx)
+            {
+                context->dpcTx += 1;
+                NetTxQueueNotifyMoreCompletedPacketsAvailable(txQueue);
+                context->txQueue = nullptr;
+            }
+
+            WdfSpinLockRelease(context->queueLock);
+        }
+
+        if (newInterruptStatus.AbnormalInterruptSummary || newInterruptStatus.FatalBusError)
         {
             // TODO - error recovery?
-            context->dpcAbnormalStatus += status.AbnormalInterruptSummary;
-            context->dpcFatalBusError += status.FatalBusError;
+            context->dpcAbnormalStatus += newInterruptStatus.AbnormalInterruptSummary;
+            context->dpcFatalBusError += newInterruptStatus.FatalBusError;
             TraceWrite("DeviceInterruptDpc-ERROR", LEVEL_ERROR,
-                TraceLoggingHexInt32(status.Value32, "status"));
+                TraceLoggingHexInt32(newInterruptStatus.Value32, "status"));
         }
         else
         {
             TraceWrite("DeviceInterruptDpc", LEVEL_VERBOSE,
-                TraceLoggingHexInt32(status.Value32, "status"));
+                TraceLoggingHexInt32(newInterruptStatus.Value32, "status"));
         }
 
-        if (status.Value32 & LinkStatusBit)
+        // Enable interrupts if disabled by ISR.
+        WdfInterruptAcquireLock(context->interrupt); // DISPATCH_LEVEL --> HIGH_LEVEL
+        if (context->interruptsWanted != InterruptsNone)
         {
-            context->dpcLinkState += 1;
-            UpdateLinkState(context);
+            DeviceInterruptSet_Locked(context->regs, context->interruptsWanted);
         }
-
-        auto const interruptsRxTx = static_cast<InterruptsWanted>(
-            (status.Rx ? InterruptsRx : InterruptsNone) |
-            (status.Tx ? InterruptsTx : InterruptsNone));
-        if (interruptsRxTx != 0)
-        {
-            WdfSpinLockAcquire(context->lock);
-
-            DeviceInterruptDisable_Locked(context, interruptsRxTx);
-
-            if (status.Rx && context->rxQueue)
-            {
-                context->dpcRx += 1;
-                NetRxQueueNotifyMoreReceivedPacketsAvailable(context->rxQueue);
-                context->rxQueue = nullptr;
-            }
-
-            if (status.Tx && context->txQueue)
-            {
-                context->dpcTx += 1;
-                NetTxQueueNotifyMoreCompletedPacketsAvailable(context->txQueue);
-                context->txQueue = nullptr;
-            }
-
-            WdfSpinLockRelease(context->lock);
-        }
+        WdfInterruptReleaseLock(context->interrupt); // HIGH_LEVEL --> DISPATCH_LEVEL
     }
 }
 
@@ -502,8 +527,9 @@ DeviceD0Entry(
     Write32(&context->regs->MacConfiguration, macConfig);
 
     // Clear and then enable interrupts.
-    UpdateLinkState(context);
-    (void)Read32(&context->regs->DmaCh[0].Status);
+
+    UpdateLinkState(context); // Clears LinkStatus interrupt.
+    Write32(&context->regs->DmaCh[0].Status, ChannelStatus_t(~0u));
     DeviceInterruptEnable(context, InterruptsState);
 
     TraceEntryExitWithStatus(DeviceD0Entry, LEVEL_INFO, status,
@@ -819,11 +845,11 @@ DevicePrepareHardware(
         dmaCaps.MaximumPhysicalAddress = maxPhysicalAddress;
 
         NET_ADAPTER_TX_CAPABILITIES txCaps;
-        NET_ADAPTER_TX_CAPABILITIES_INIT_FOR_DMA(&txCaps, &dmaCaps, 1);
+        NET_ADAPTER_TX_CAPABILITIES_INIT_FOR_DMA(&txCaps, &dmaCaps, QueuesSupported);
         txCaps.MaximumNumberOfFragments = QueueDescriptorMinCount - 1;
 
         NET_ADAPTER_RX_CAPABILITIES rxCaps; // TODO: Might use less memory if driver-managed.
-        NET_ADAPTER_RX_CAPABILITIES_INIT_SYSTEM_MANAGED_DMA(&rxCaps, &dmaCaps, RxBufferSize, 1); // TODO: Jumbo packets.
+        NET_ADAPTER_RX_CAPABILITIES_INIT_SYSTEM_MANAGED_DMA(&rxCaps, &dmaCaps, RxBufferSize, QueuesSupported); // TODO: Jumbo packets.
 
         NetAdapterSetDataPathCapabilities(context->adapter, &txCaps, &rxCaps);
 
@@ -846,7 +872,9 @@ DevicePrepareHardware(
     // Initialize adapter.
 
     {
-        status = DeviceReset(context->regs, context->currentMacAddress);
+        auto const regs = context->regs;
+
+        status = DeviceReset(regs, context->currentMacAddress);
         if (!NT_SUCCESS(status))
         {
             goto Done;
@@ -855,7 +883,7 @@ DevicePrepareHardware(
         // TODO: use ACPI _DSD?
         // TODO: review. This is what the NetBSD driver seems to be doing, and
         // it seems to work ok, but it doesn't line up with the documentation.
-        auto busMode = Read32(&context->regs->DmaSysBusMode);
+        auto busMode = Read32(&regs->DmaSysBusMode);
         busMode.Reserved14 = true; // mixed-burst?
         busMode.FixedBurst = false;
         busMode.AxiMaxWriteOutstanding = DefaultAxiMaxWriteOutstanding;
@@ -863,9 +891,9 @@ DevicePrepareHardware(
         busMode.BurstLength16 = true;
         busMode.BurstLength8 = true;
         busMode.BurstLength4 = true;
-        Write32(&context->regs->DmaSysBusMode, busMode);
+        Write32(&regs->DmaSysBusMode, busMode);
 
-        Write32(&context->regs->Mac1usTicCounter, DefaultCsrRate / 1'000'000u - 1);
+        Write32(&regs->Mac1usTicCounter, DefaultCsrRate / 1'000'000u - 1);
 
         static_assert(sizeof(RxDescriptor) == sizeof(TxDescriptor));
         static_assert(sizeof(RxDescriptor) % BusBytes == 0,
@@ -873,9 +901,9 @@ DevicePrepareHardware(
         ChannelDmaControl_t dmaControl = {};
         dmaControl.DescriptorSkipLength = (sizeof(RxDescriptor) - 16) / BusBytes;
         dmaControl.PblX8 = QueueBurstLengthX8;
-        Write32(&context->regs->DmaCh[0].DmaControl, dmaControl);
+        Write32(&regs->DmaCh[0].DmaControl, dmaControl);
 
-        Write32(&context->regs->MmcControl, 0x1); // Reset counters.
+        Write32(&regs->MmcControl, 0x9); // Reset and freeze MMC counters because they generate interrupts.
     }
 
     // Start adapter.
@@ -919,6 +947,8 @@ DeviceReleaseHardware(
             CtxStat(dpcTx),
             CtxStat(dpcAbnormalStatus),
             CtxStat(dpcFatalBusError));
+
+#if 0 // MMC frozen for now
         TraceWrite("DeviceReleaseHardware-TxStats", LEVEL_INFO,
             RegStat(TxPacketCountGoodBad),
             RegStat(TxUnderflowErrorPackets),
@@ -932,6 +962,7 @@ DeviceReleaseHardware(
             RegStat(RxPausePackets),
             RegStat(RxFifoOverflowPackets),
             RegStat(RxWatchdogErrorPackets));
+#endif
 
         DeviceReset(context->regs, context->permanentMacAddress);
         MmUnmapIoSpace(context->regs, sizeof(*context->regs));
@@ -947,22 +978,21 @@ DeviceSetNotificationRxQueue(
     _In_ NETADAPTER adapter,
     _In_opt_ NETPACKETQUEUE rxQueue)
 {
-    // PASSIVE_LEVEL, nonpaged (resume path)
+    // PASSIVE_LEVEL, nonpaged (resume path, raises IRQL)
     auto const context = DeviceGetContext(AdapterGetContext(adapter)->device);
 
-    WdfSpinLockAcquire(context->lock);
-
+    WdfSpinLockAcquire(context->queueLock); // PASSIVE_LEVEL --> DISPATCH_LEVEL
     context->rxQueue = rxQueue;
+    WdfSpinLockRelease(context->queueLock); // DISPATCH_LEVEL --> PASSIVE_LEVEL
+
     if (rxQueue)
     {
-        DeviceInterruptEnable_Locked(context, InterruptsRx);
+        DeviceInterruptEnable(context, InterruptsRx);
     }
     else
     {
-        DeviceInterruptDisable_Locked(context, InterruptsRx);
+        DeviceInterruptDisable(context, InterruptsRx);
     }
-
-    WdfSpinLockRelease(context->lock);
 }
 
 void
@@ -970,22 +1000,22 @@ DeviceSetNotificationTxQueue(
     _In_ NETADAPTER adapter,
     _In_opt_ NETPACKETQUEUE txQueue)
 {
-    // PASSIVE_LEVEL, nonpaged (resume path)
+    // PASSIVE_LEVEL, nonpaged (resume path, raises IRQL)
     auto const context = DeviceGetContext(AdapterGetContext(adapter)->device);
 
-    WdfSpinLockAcquire(context->lock);
-
+    WdfSpinLockAcquire(context->queueLock); // PASSIVE_LEVEL --> DISPATCH_LEVEL
     context->txQueue = txQueue;
+    WdfSpinLockRelease(context->queueLock); // DISPATCH_LEVEL --> PASSIVE_LEVEL
+
     if (txQueue)
     {
-        DeviceInterruptEnable_Locked(context, InterruptsTx);
+        DeviceInterruptEnable(context, InterruptsTx);
     }
     else
     {
-        DeviceInterruptDisable_Locked(context, InterruptsTx);
+        DeviceInterruptDisable(context, InterruptsTx);
     }
 
-    WdfSpinLockRelease(context->lock);
 }
 
 __declspec(code_seg("PAGE"))
@@ -1052,7 +1082,7 @@ DeviceAdd(
         WDF_OBJECT_ATTRIBUTES_INIT(&attributes);
         attributes.ParentObject = device;
 
-        status = WdfSpinLockCreate(&attributes, &context->lock);
+        status = WdfSpinLockCreate(&attributes, &context->queueLock);
         if (!NT_SUCCESS(status))
         {
             TraceWrite("WdfSpinLockCreate-failed", LEVEL_ERROR,
