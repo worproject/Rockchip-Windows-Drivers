@@ -26,7 +26,7 @@ This repository contains drivers for RK35xx-based platforms, with a focus on RK3
 |Multimedia codecs||🔴 Not working||
 |DSI||🔴 Not working||
 |CSI||🔴 Not working||
-|GMAC Ethernet|[dwc_eqos](tree/master/drivers/net/dwc_eqos)|🟡 Partially working|1000Mbps only (gigabit Ethernet only - 10/100 not yet supported)|
+|GMAC Ethernet|[dwc_eqos](drivers/net/dwc_eqos)|🟡 Partially working|1000Mbps only (gigabit Ethernet only - 10/100 not yet supported)|
 |UART||🔴 Not working|No OS driver but debugging does work on UART2, being configured by UEFI.|
 |GPIO|[rk3xgpio](https://github.com/worproject/Rockchip-Windows-Drivers/tree/master/drivers/gpio)|🟢 Working||
 |I2C|[rk3xi2c](https://github.com/worproject/Rockchip-Windows-Drivers/tree/master/drivers/i2c)|🟢 Working||
