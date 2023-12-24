@@ -304,7 +304,8 @@ TxQueueCancel(_In_ NETPACKETQUEUE queue)
     {
         // Wait for a potential in-progress packet to be sent.
 
-        for (retry = 0; retry != 10; retry += 1)
+        unsigned constexpr MaxRetry = 100;
+        for (retry = 0; retry != MaxRetry; retry += 1)
         {
             auto debug = Read32(&context->mtlRegs->TxDebug);
 
@@ -316,7 +317,7 @@ TxQueueCancel(_In_ NETPACKETQUEUE queue)
             KeStallExecutionProcessor(20);
         }
 
-        if (retry != 0)
+        if (retry != MaxRetry)
         {
             // Last chance for any packets to be reported as sent.
             mode = 1;

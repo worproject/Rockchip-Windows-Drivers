@@ -1579,7 +1579,7 @@ struct MacRegisters
 
     // MTL_DBG_STS @ 0x0C0C = 0x1900000:
     // The FIFO Debug Status register contains the status of FIFO debug access.
-    ULONG MtlDdbSts;
+    ULONG MtlDebugStatus;
 
     // MTL_FIFO_Debug_Data @ 0x0C10 = 0x0:
     // The FIFO Debug Data register contains the data to be written to or read from

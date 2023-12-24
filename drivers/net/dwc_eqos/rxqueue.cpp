@@ -203,7 +203,10 @@ RxQueueAdvance(_In_ NETPACKETQUEUE queue)
             queuedPkts += 1;
         }
 
-        if (descIndex != context->descEnd)
+        // In some error cases, the device may stall until we write to the tail pointer
+        // again. Write to the tail pointer if there are pending descriptors, even if we
+        // didn't fill any new ones.
+        if (descIndex != descNext)
         {
             SetDescEnd(context, descIndex);
             context->fragmentRing->NextIndex = fragIndex;
