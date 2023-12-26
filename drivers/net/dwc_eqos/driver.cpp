@@ -1,5 +1,5 @@
 #include "precomp.h"
-#include "device.h"
+#include "device.h" // DeviceAdd
 #include "trace.h"
 
 /*
@@ -7,14 +7,14 @@ TODO list:
 - Support for 10/100 Mbps modes (requires ACPI support).
 - Use ACPI to get DMA configuration.
 - Jumbo frames.
-- Receive queue memory optimization.
-- Configuration.
+- Receive queue memory optimization?
+- Configuration in registry (e.g. flow control).
 - Checksum offload.
 - Tx segmentation offload.
 - Rx segmentation offload.
 - Wake-on-LAN.
 - ARP offload.
-- Multi-queue support.
+- Multi-queue support?
 */
 
 TRACELOGGING_DEFINE_PROVIDER(

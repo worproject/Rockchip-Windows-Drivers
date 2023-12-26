@@ -21,21 +21,21 @@ struct RxQueueContext
     UINT32 descCount;   // A power of 2 between QueueDescriptorMinCount and QueueDescriptorMaxCount.
     bool running;
 
-    UINT32 descBegin;
-    UINT32 descEnd;
+    UINT32 descBegin;   // Start of the RECEIVE region.
+    UINT32 descEnd;     // End of the RECEIVE region, start of the EMPTY region.
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(RxQueueContext, RxQueueGetContext)
 
-// Gets channelRegs->RxCurrentAppDesc, converted to an index.
+// Gets channelRegs->Current_App_RxDesc, converted to an index.
 static UINT32
 GetDescNext(_In_ RxQueueContext* context)
 {
     // DISPATCH_LEVEL
-    auto const current = Read32(&context->channelRegs->RxCurrentAppDesc);
+    auto const current = Read32(&context->channelRegs->Current_App_RxDesc);
     return QueueDescriptorAddressToIndex(current, context->descPhysical, context->descCount);
 }
 
-// Sets channelRegs->RxDescTailPointer to the physical address of the descriptor at the given index.
+// Sets channelRegs->RxDesc_Tail_Pointer to the physical address of the descriptor at the given index.
 static void
 SetDescEnd(
     _In_ RxQueueContext* context,
@@ -44,7 +44,7 @@ SetDescEnd(
     // DISPATCH_LEVEL
     NT_ASSERT(index < context->descCount);
     UINT32 const offset = index * sizeof(RxDescriptor);
-    Write32(&context->channelRegs->RxDescTailPointer, context->descPhysical.LowPart + offset);
+    Write32(&context->channelRegs->RxDesc_Tail_Pointer, context->descPhysical.LowPart + offset);
     context->descEnd = index;
 }
 
@@ -59,9 +59,9 @@ RxQueueStart(_In_ NETPACKETQUEUE queue)
     context->descBegin = 0;
     context->descEnd = 0;
 
-    Write32(&context->channelRegs->RxDescListAddressHigh, context->descPhysical.HighPart);
-    Write32(&context->channelRegs->RxDescListAddress, context->descPhysical.LowPart);
-    Write32(&context->channelRegs->RxDescRingLength, context->descCount - 1);
+    Write32(&context->channelRegs->RxDesc_List_Address_Hi, context->descPhysical.HighPart);
+    Write32(&context->channelRegs->RxDesc_List_Address, context->descPhysical.LowPart);
+    Write32(&context->channelRegs->RxDesc_Ring_Length, context->descCount - 1);
     SetDescEnd(context, context->descEnd);
 
 #if DBG
@@ -73,7 +73,7 @@ RxQueueStart(_In_ NETPACKETQUEUE queue)
     rxControl.Start = true;
     rxControl.ReceiveBufferSize = RxBufferSize;
     rxControl.RxPbl = QueueBurstLength;
-    Write32(&context->channelRegs->RxControl, rxControl);
+    Write32(&context->channelRegs->Rx_Control, rxControl);
 
     TraceEntryExit(RxQueueStart, LEVEL_INFO);
 }
@@ -115,10 +115,15 @@ RxQueueAdvance(_In_ NETPACKETQUEUE queue)
         auto const& desc = context->descVirtual[descIndex];
         auto const descWrite = desc.Write;
 
+        // Descriptor is still owned by the DMA engine?
         NT_ASSERT(!descWrite.Own);
         if (descWrite.Own)
         {
-            // I've never seen this happen, but if it does, we need to stop here.
+            /*
+            This sometimes happens with transmit descriptors.
+            I've never seen it happen with receive descriptors, but if it does, breaking out here
+            should take care of it.
+            */
             TraceWrite("RxQueueAdvance-own", LEVEL_WARNING,
                 TraceLoggingUInt32(descIndex, "descIndex"),
                 TraceLoggingHexInt32(reinterpret_cast<UINT32 const*>(&descWrite)[3], "RDES3"));
@@ -195,7 +200,9 @@ RxQueueAdvance(_In_ NETPACKETQUEUE queue)
             descRead.Buf1Valid = true;
             descRead.InterruptOnCompletion = true;
             descRead.Own = true;
+#if DBG
             descRead.FragmentIndex = fragIndex;
+#endif
 
             context->descVirtual[descIndex].Read = descRead;
 
@@ -257,7 +264,7 @@ RxQueueCancel(_In_ NETPACKETQUEUE queue)
     ChannelRxControl_t rxControl = {};
     rxControl.Start = false;
     rxControl.RxPacketFlush = true;
-    Write32(&context->channelRegs->RxControl, rxControl);
+    Write32(&context->channelRegs->Rx_Control, rxControl);
 
     TraceEntryExit(RxQueueCancel, LEVEL_INFO);
 }

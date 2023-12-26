@@ -1,11 +1,14 @@
+/*
+Transmit queue behavior. Similar to the receive queue.
+*/
 #pragma once
 
 struct ChannelRegisters;
 struct MtlQueueRegisters;
 
+// Called by device.cpp AdapterCreateTxQueue.
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-//__declspec(code_seg("PAGE")) // Nonpaged - on resume path.
 NTSTATUS
 TxQueueCreate(
     _In_ NETADAPTER adapter,
