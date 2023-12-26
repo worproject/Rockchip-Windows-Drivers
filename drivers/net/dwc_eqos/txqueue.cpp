@@ -25,16 +25,16 @@ struct TxQueueContext
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(TxQueueContext, TxQueueGetContext)
 
-// Gets channelRegs->TxCurrentAppDesc, converted to an index.
+// Gets channelRegs->Current_App_TxDesc, converted to an index.
 static UINT32
 GetDescNext(_In_ TxQueueContext* context)
 {
     // DISPATCH_LEVEL
-    auto const current = Read32(&context->channelRegs->TxCurrentAppDesc);
+    auto const current = Read32(&context->channelRegs->Current_App_TxDesc);
     return QueueDescriptorAddressToIndex(current, context->descPhysical, context->descCount);
 }
 
-// Sets channelRegs->TxDescTailPointer to the physical address of the descriptor at the given index.
+// Sets channelRegs->TxDesc_Tail_Pointer to the physical address of the descriptor at the given index.
 static void
 SetDescEnd(
     _In_ TxQueueContext* context,
@@ -43,7 +43,7 @@ SetDescEnd(
     // DISPATCH_LEVEL
     NT_ASSERT(index < context->descCount);
     UINT32 const offset = index * sizeof(TxDescriptor);
-    Write32(&context->channelRegs->TxDescTailPointer, context->descPhysical.LowPart + offset);
+    Write32(&context->channelRegs->TxDesc_Tail_Pointer, context->descPhysical.LowPart + offset);
     context->descEnd = index;
 }
 
@@ -57,9 +57,9 @@ TxQueueStart(_In_ NETPACKETQUEUE queue)
     context->descBegin = 0;
     context->descEnd = 0;
 
-    Write32(&context->channelRegs->TxDescListAddressHigh,context->descPhysical.HighPart);
-    Write32(&context->channelRegs->TxDescListAddress, context->descPhysical.LowPart);
-    Write32(&context->channelRegs->TxDescRingLength, context->descCount - 1);
+    Write32(&context->channelRegs->TxDesc_List_Address_Hi,context->descPhysical.HighPart);
+    Write32(&context->channelRegs->TxDesc_List_Address, context->descPhysical.LowPart);
+    Write32(&context->channelRegs->TxDesc_Ring_Length, context->descCount - 1);
     SetDescEnd(context, context->descEnd);
 
 #if DBG
@@ -71,7 +71,7 @@ TxQueueStart(_In_ NETPACKETQUEUE queue)
     txControl.Start = true;
     txControl.OperateOnSecondPacket = true;
     txControl.TxPbl = QueueBurstLength;
-    Write32(&context->channelRegs->TxControl, txControl);
+    Write32(&context->channelRegs->Tx_Control, txControl);
 
     TraceEntryExit(TxQueueStart, LEVEL_INFO);
 }
@@ -134,7 +134,7 @@ TxQueueAdvance(_In_ NETPACKETQUEUE queue)
                 if (descWrite.Own)
                 {
                     /*
-                    There's a race condition where we see the update to TxCurrentAppDesc
+                    There's a race condition where we see the update to Current_App_TxDesc
                     before we see the update to the descriptor. It seems harmless (we
                     only use the descriptor for assertions and logging), and a fix for
                     this would likely affect performance, so just stop when we see a
@@ -233,8 +233,10 @@ DoneIndicating:
                 descRead.LastDescriptor = i == fragmentCount - 1u;
                 descRead.FirstDescriptor = i == 0;
                 descRead.Own = true;
+#if DBG
                 descRead.PacketIndex = pktIndex;
                 descRead.FragmentIndex = fragIndex;
+#endif
 
                 context->descVirtual[descIndex].Read = descRead;
                 descIndex = (descIndex + 1) & descMask;
@@ -289,7 +291,7 @@ TxQueueCancel(_In_ NETPACKETQUEUE queue)
 
     ChannelTxControl_t txControl = {};
     txControl.Start = false;
-    Write32(&context->channelRegs->TxControl, txControl);
+    Write32(&context->channelRegs->Tx_Control, txControl);
 
     // Flush.
 
@@ -298,7 +300,7 @@ TxQueueCancel(_In_ NETPACKETQUEUE queue)
         // Queue empty.
         mode = 0;
         retry = 0;
-        NT_ASSERT(Read32(&context->mtlRegs->TxDebug).NotEmpty == 0);
+        NT_ASSERT(Read32(&context->mtlRegs->Tx_Debug).NotEmpty == 0);
     }
     else
     {
@@ -307,7 +309,7 @@ TxQueueCancel(_In_ NETPACKETQUEUE queue)
         unsigned constexpr MaxRetry = 100;
         for (retry = 0; retry != MaxRetry; retry += 1)
         {
-            auto debug = Read32(&context->mtlRegs->TxDebug);
+            auto debug = Read32(&context->mtlRegs->Tx_Debug);
 
             if (debug.ReadStatus != MtlTxReadStatus_Read && debug.NotEmpty == 0)
             {
@@ -328,13 +330,13 @@ TxQueueCancel(_In_ NETPACKETQUEUE queue)
             // Give up and reset the Tx queue.
             mode = 2;
             TraceWrite("TxQueueCancel-timeout", LEVEL_WARNING);
-            auto txOperationMode = Read32(&context->mtlRegs->TxOperationMode);
+            auto txOperationMode = Read32(&context->mtlRegs->Tx_Operation_Mode);
             txOperationMode.FlushTxQueue = true;
-            Write32(&context->mtlRegs->TxOperationMode, txOperationMode);
+            Write32(&context->mtlRegs->Tx_Operation_Mode, txOperationMode);
             for (retry = 0;; retry += 1)
             {
                 KeStallExecutionProcessor(20);
-                if (!Read32(&context->mtlRegs->TxOperationMode).FlushTxQueue)
+                if (!Read32(&context->mtlRegs->Tx_Operation_Mode).FlushTxQueue)
                 {
                     break;
                 }

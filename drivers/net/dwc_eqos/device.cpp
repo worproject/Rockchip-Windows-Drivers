@@ -24,7 +24,7 @@ static auto constexpr DefaultAxiMaxWriteOutstanding = 4u;
 static auto constexpr DefaultAxiMaxReadOutstanding = 8u;
 static auto constexpr DefaultCsrRate = 125'000'000u;
 static auto constexpr BusBytes = 8u;
-static auto constexpr QueuesSupported = 1u; // TODO: Support multiple queues.
+static auto constexpr QueuesSupported = 1u; // TODO: Support multiple queues?
 static auto constexpr InterruptLinkStatus = 0x80000000u;
 static auto constexpr InterruptChannel0Status = ~InterruptLinkStatus;
 
@@ -95,8 +95,8 @@ SetOneMacAddress(_Inout_ MacRegisters* regs, unsigned index, _In_reads_(6) UINT8
     regHi.Addr5 = addr[5];
     regHi.AddressEnable = enable;
 
-    Write32(&regs->MacAddress[index].High, regHi);
-    Write32(&regs->MacAddress[index].Low, regLo);
+    Write32(&regs->Mac_Address[index].High, regHi);
+    Write32(&regs->Mac_Address[index].Low, regLo);
 
     TraceEntryExit(SetOneMacAddress, LEVEL_VERBOSE,
         TraceLoggingUInt32(index),
@@ -114,12 +114,12 @@ DeviceReset(_Inout_ MacRegisters* regs, _In_reads_(6) UINT8 const* mac0)
     // PASSIVE_LEVEL
     PAGED_CODE();
 
-    Write32(&regs->DmaMode, 1); // Software reset.
+    Write32(&regs->Dma_Mode, 1); // Software reset.
 
     for (unsigned retry = 0; retry != 1000; retry -= 1)
     {
         KeStallExecutionProcessor(20);
-        auto const dmaMode = Read32(&regs->DmaMode);
+        auto const dmaMode = Read32(&regs->Dma_Mode);
         if (0 == (dmaMode & 1))
         {
             SetOneMacAddress(regs, 0, mac0, true);
@@ -138,8 +138,8 @@ static void
 UpdateLinkState(_In_ DeviceContext const* context)
 {
     // DISPATCH_LEVEL
-    auto const controlStatus = Read32(&context->regs->MacPhyIfControlStatus); // Clears LinkStatus interrupt.
-    auto const oldConfig = Read32(&context->regs->MacConfiguration);
+    auto const controlStatus = Read32(&context->regs->Mac_PhyIf_Control_Status); // Clears LinkStatus interrupt.
+    auto const oldConfig = Read32(&context->regs->Mac_Configuration);
     auto newConfig = oldConfig;
     newConfig.FullDuplex = controlStatus.FullDuplex;
 
@@ -167,7 +167,7 @@ UpdateLinkState(_In_ DeviceContext const* context)
 
     if (oldConfig.Value32 != newConfig.Value32)
     {
-        Write32(&context->regs->MacConfiguration, newConfig);
+        Write32(&context->regs->Mac_Configuration, newConfig);
     }
 
     NET_ADAPTER_LINK_STATE linkState;
@@ -188,7 +188,7 @@ UpdateLinkState(_In_ DeviceContext const* context)
         TraceLoggingHexInt32(newConfig.Value32, "NewMacConfig"));
 }
 
-// Cleared by reading MacPhyIfControlStatus.
+// Cleared by reading Mac_PhyIf_Control_Status.
 _IRQL_requires_max_(HIGH_LEVEL)
 static MacInterruptEnable_t
 MakeMacInterruptEnable(InterruptsWanted wanted)
@@ -219,8 +219,8 @@ static void
 DeviceInterruptSet_Locked(_Inout_ MacRegisters* regs, InterruptsWanted wanted)
 {
     // HIGH_LEVEL
-    Write32(&regs->MacInterruptEnable, MakeMacInterruptEnable(wanted));
-    Write32(&regs->DmaCh[0].InterruptEnable, MakeChannelInterruptEnable(wanted));
+    Write32(&regs->Mac_Interrupt_Enable, MakeMacInterruptEnable(wanted));
+    Write32(&regs->Dma_Ch[0].Interrupt_Enable, MakeChannelInterruptEnable(wanted));
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -284,19 +284,19 @@ DeviceInterruptIsr(
 
     ChannelStatus_t newInterruptStatus = {};
 
-    auto const mac = Read32(&regs->MacInterruptStatus);
+    auto const mac = Read32(&regs->Mac_Interrupt_Status);
     if (mac.LinkStatus)
     {
         newInterruptStatus.Value32 |= InterruptLinkStatus;
-        (void)Read32(&regs->MacPhyIfControlStatus); // Clears interrupt status.
+        (void)Read32(&regs->Mac_PhyIf_Control_Status); // Clears interrupt status.
     }
 
-    auto const channel0 = Read32(&regs->DmaCh[0].Status);
+    auto const channel0 = Read32(&regs->Dma_Ch[0].Status);
     newInterruptStatus.Value32 |= channel0.Value32 & InterruptChannel0Status;
 
     if (newInterruptStatus.Value32 != 0)
     {
-        Write32(&regs->DmaCh[0].Status, channel0); // Clears DmaCh0.Status.
+        Write32(&regs->Dma_Ch[0].Status, channel0); // Clears Dma_Ch0.Status.
 
         // Disable interrupts until DPC runs.
         DeviceInterruptSet_Locked(regs, InterruptsNone); // Interrupt lock is already held.
@@ -410,8 +410,8 @@ AdapterCreateTxQueue(
         adapter,
         queueInit,
         context->dma,
-        &context->regs->DmaCh[0],
-        &context->regs->MtlQ[0]);
+        &context->regs->Dma_Ch[0],
+        &context->regs->Mtl_Q[0]);
 }
 
 static EVT_NET_ADAPTER_CREATE_RXQUEUE AdapterCreateRxQueue;
@@ -427,7 +427,7 @@ AdapterCreateRxQueue(
         adapter,
         queueInit,
         context->dma,
-        &context->regs->DmaCh[0]);
+        &context->regs->Dma_Ch[0]);
 }
 
 static EVT_NET_ADAPTER_SET_RECEIVE_FILTER AdapterSetReceiveFilter;
@@ -472,7 +472,7 @@ AdapterSetReceiveFilter(
         }
     }
 
-    Write32(&context->regs->MacPacketFilter, filter);
+    Write32(&context->regs->Mac_Packet_Filter, filter);
 
     TraceExit(AdapterSetReceiveFilter, LEVEL_INFO,
         TraceLoggingHexInt32(flags),
@@ -494,18 +494,18 @@ DeviceD0Entry(
     MacTxFlowCtrl_t txFlowCtrl = {};
     txFlowCtrl.TransmitFlowControlEnable = true;
     txFlowCtrl.PauseTime = 0xFFFF;
-    Write32(&context->regs->MacTxFlowCtrl, txFlowCtrl); // TxFlow control, pause time.
+    Write32(&context->regs->Mac_Tx_Flow_Ctrl, txFlowCtrl); // TxFlow control, pause time.
 
     MtlTxOperationMode_t txOperationMode = {};
     txOperationMode.StoreAndForward = true;
     txOperationMode.QueueEnable = MtlTxQueueEnable_Enabled;
     txOperationMode.QueueSize = (128u << context->feature1.TxFifoSize) / 256u - 1; // Use 100% of FIFO. (TODO: Not sure about the -1.)
-    Write32(&context->regs->MtlQ[0].TxOperationMode, txOperationMode);
+    Write32(&context->regs->Mtl_Q[0].Tx_Operation_Mode, txOperationMode);
 
     // RX configuration.
 
-    Write32(&context->regs->MacRxFlowCtrl, 0x3); // Rx flow control, pause packet detect.
-    Write32(&context->regs->MacRxCtrl0, 0x2); // RxQ0 enabled for DCB/generic.
+    Write32(&context->regs->Mac_Rx_Flow_Ctrl, 0x3); // Rx flow control, pause packet detect.
+    Write32(&context->regs->Mac_RxQ_Ctrl0, 0x2); // RxQ0 enabled for DCB/generic.
 
     MtlRxOperationMode_t rxOperationMode = {};
     rxOperationMode.StoreAndForward = true;
@@ -513,9 +513,9 @@ DeviceD0Entry(
     rxOperationMode.ForwardUndersizedGoodPackets = true;
     rxOperationMode.QueueSize = (128u << context->feature1.RxFifoSize) / 256u - 1; // Use 100% of FIFO. (TODO: Not sure about the -1.)
     rxOperationMode.HardwareFlowControl = true;
-    rxOperationMode.FlowControlActivate = 2; // Full - 2KB
-    rxOperationMode.FlowControlDeactivate = 10; // Full - 6KB
-    Write32(&context->regs->MtlQ[0].RxOperationMode, rxOperationMode);
+    rxOperationMode.FlowControlActivate = 2; // Full - 2KB. (TODO: Tune.)
+    rxOperationMode.FlowControlDeactivate = 10; // Full - 6KB. (TODO: Tune.)
+    Write32(&context->regs->Mtl_Q[0].Rx_Operation_Mode, rxOperationMode);
 
     // MAC configuration.
 
@@ -524,12 +524,12 @@ DeviceD0Entry(
     macConfig.PacketBurstEnable = true;
     macConfig.ReceiverEnable = true;
     macConfig.TransmitterEnable = true;
-    Write32(&context->regs->MacConfiguration, macConfig);
+    Write32(&context->regs->Mac_Configuration, macConfig);
 
     // Clear and then enable interrupts.
 
     UpdateLinkState(context); // Clears LinkStatus interrupt.
-    Write32(&context->regs->DmaCh[0].Status, ChannelStatus_t(~0u));
+    Write32(&context->regs->Dma_Ch[0].Status, ChannelStatus_t(~0u));
     DeviceInterruptEnable(context, InterruptsState);
 
     TraceEntryExitWithStatus(DeviceD0Entry, LEVEL_INFO, status,
@@ -554,10 +554,10 @@ DeviceD0Exit(
     NT_ASSERT(context->txQueue == nullptr);
     NT_ASSERT(context->rxQueue == nullptr);
 
-    auto macConfig = Read32(&context->regs->MacConfiguration);
+    auto macConfig = Read32(&context->regs->Mac_Configuration);
     macConfig.ReceiverEnable = false;
     macConfig.TransmitterEnable = false;
-    Write32(&context->regs->MacConfiguration, macConfig);
+    Write32(&context->regs->Mac_Configuration, macConfig);
 
     TraceEntryExitWithStatus(DeviceD0Exit, LEVEL_INFO, status,
         TraceLoggingUInt32(targetState));
@@ -719,8 +719,8 @@ DevicePrepareHardware(
     // Set up MAC address
 
     {
-        auto const mac0hi = Read32(&context->regs->MacAddress[0].High);
-        auto const mac0lo = Read32(&context->regs->MacAddress[0].Low);
+        auto const mac0hi = Read32(&context->regs->Mac_Address[0].High);
+        auto const mac0lo = Read32(&context->regs->Mac_Address[0].Low);
         context->permanentMacAddress[0] = mac0lo.Addr0;
         context->permanentMacAddress[1] = mac0lo.Addr1;
         context->permanentMacAddress[2] = mac0lo.Addr2;
@@ -756,11 +756,11 @@ DevicePrepareHardware(
     // Read features
 
     {
-        auto const version = Read32(&context->regs->MacVersion);
-        context->feature0 = Read32(&context->regs->MacHwFeature0);
-        context->feature1 = Read32(&context->regs->MacHwFeature1);
-        context->feature2 = Read32(&context->regs->MacHwFeature2);
-        context->feature3 = Read32(&context->regs->MacHwFeature3);
+        auto const version = Read32(&context->regs->Mac_Version);
+        context->feature0 = Read32(&context->regs->Mac_Hw_Feature0);
+        context->feature1 = Read32(&context->regs->Mac_Hw_Feature1);
+        context->feature2 = Read32(&context->regs->Mac_Hw_Feature2);
+        context->feature3 = Read32(&context->regs->Mac_Hw_Feature3);
         TraceWrite("DevicePrepareHardware-config", LEVEL_INFO,
             TraceLoggingHexInt32(version.RkVer, "RkVer"),
             TraceLoggingHexInt32(version.UserVer, "UserVer"),
@@ -883,7 +883,7 @@ DevicePrepareHardware(
         // TODO: use ACPI _DSD?
         // TODO: review. This is what the NetBSD driver seems to be doing, and
         // it seems to work ok, but it doesn't line up with the documentation.
-        auto busMode = Read32(&regs->DmaSysBusMode);
+        auto busMode = Read32(&regs->Dma_SysBus_Mode);
         busMode.Reserved14 = true; // mixed-burst?
         busMode.FixedBurst = false;
         busMode.AxiMaxWriteOutstanding = DefaultAxiMaxWriteOutstanding;
@@ -891,9 +891,9 @@ DevicePrepareHardware(
         busMode.BurstLength16 = true;
         busMode.BurstLength8 = true;
         busMode.BurstLength4 = true;
-        Write32(&regs->DmaSysBusMode, busMode);
+        Write32(&regs->Dma_SysBus_Mode, busMode);
 
-        Write32(&regs->Mac1usTicCounter, DefaultCsrRate / 1'000'000u - 1);
+        Write32(&regs->Mac_1us_Tic_Counter, DefaultCsrRate / 1'000'000u - 1);
 
         static_assert(sizeof(RxDescriptor) == sizeof(TxDescriptor));
         static_assert(sizeof(RxDescriptor) % BusBytes == 0,
@@ -901,9 +901,9 @@ DevicePrepareHardware(
         ChannelDmaControl_t dmaControl = {};
         dmaControl.DescriptorSkipLength = (sizeof(RxDescriptor) - 16) / BusBytes;
         dmaControl.PblX8 = QueueBurstLengthX8;
-        Write32(&regs->DmaCh[0].DmaControl, dmaControl);
+        Write32(&regs->Dma_Ch[0].Control, dmaControl);
 
-        Write32(&regs->MmcControl, 0x9); // Reset and freeze MMC counters because they generate interrupts.
+        Write32(&regs->Mmc_Control, 0x9); // Reset and freeze MMC counters because they generate interrupts.
     }
 
     // Start adapter.
