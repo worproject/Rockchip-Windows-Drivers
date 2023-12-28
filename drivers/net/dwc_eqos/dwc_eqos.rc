@@ -1,0 +1,30 @@
+#include <verrsrc.h>
+#include <dwc_eqos_perf.rc>
+
+#define VER_FILETYPE                VFT_DRV
+#define VER_FILESUBTYPE             VFT2_DRV_SYSTEM
+#define VER_FILEDESCRIPTION_STR     "Synopsys DesignWare Ethernet Quality of Service (GMAC) driver for RK3588"
+#define VER_INTERNALNAME_STR        "dwc_eqos.sys"
+#define VER_ORIGINALFILENAME_STR    "dwc_eqos.sys"
+
+#define VER_LEGALCOPYRIGHT_YEARS    "2023"
+#define VER_LEGALCOPYRIGHT_STR      "Copyright (C) " VER_LEGALCOPYRIGHT_YEARS
+
+#define VER_FILEVERSION             1,0,0,0
+#define VER_PRODUCTVERSION_STR      "1.0.0.0"
+#define VER_PRODUCTVERSION          1,0,0,0
+#define LVER_PRODUCTVERSION_STR     L"1.0.0.0"
+
+#define VER_FILEFLAGSMASK           (VS_FF_DEBUG | VS_FF_PRERELEASE)
+#ifdef DEBUG
+#define VER_FILEFLAGS               (VS_FF_DEBUG)
+#else
+#define VER_FILEFLAGS               (0)
+#endif
+
+#define VER_FILEOS                  VOS_NT_WINDOWS32
+
+#define VER_COMPANYNAME_STR         "Open Source"
+#define VER_PRODUCTNAME_STR         "RK3588"
+
+#include "common.ver"

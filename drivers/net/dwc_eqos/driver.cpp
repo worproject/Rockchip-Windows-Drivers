@@ -31,6 +31,7 @@ DriverUnload(_In_ WDFDRIVER driver)
     // PASSIVE_LEVEL
     PAGED_CODE();
     UNREFERENCED_PARAMETER(driver);
+    DevicePerfUnregister();
     TraceEntryExit(DriverUnload, LEVEL_INFO);
     TraceLoggingUnregister(TraceProvider);
 }
@@ -56,12 +57,18 @@ DriverEntry(
     config.EvtDriverUnload = DriverUnload;
     config.DriverPoolTag = 'dwcE';
 
+    WDFDRIVER driver;
     status = WdfDriverCreate(
         driverObject,
         registryPath,
         WDF_NO_OBJECT_ATTRIBUTES,
         &config,
-        WDF_NO_HANDLE);
+        &driver);
+
+    if (NT_SUCCESS(status))
+    {
+        DevicePerfRegister(driver);
+    }
 
     TraceExitWithStatus(DriverEntry, LEVEL_INFO, status);
 

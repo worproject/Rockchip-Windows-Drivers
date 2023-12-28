@@ -9,6 +9,16 @@ __declspec(code_seg("PAGE"))
 EVT_WDF_DRIVER_DEVICE_ADD
 DeviceAdd;
 
+// Called by driver.cpp DriverEntry.
+__declspec(code_seg("INIT"))
+void
+DevicePerfRegister(_In_ WDFDRIVER driver);
+
+// Called by driver.cpp DriverUnload.
+__declspec(code_seg("PAGE"))
+void
+DevicePerfUnregister();
+
 // Called by rxqueue.cpp RxQueueSetNotificationEnabled.
 void
 DeviceSetNotificationRxQueue(
