@@ -11,7 +11,7 @@ struct RxQueueContext
 {
     ChannelRegisters* channelRegs;
 
-    NETADAPTER adapter;
+    DeviceContext* deviceContext;
     NET_RING* packetRing;
     NET_RING* fragmentRing;
     WDFCOMMONBUFFER descBuffer;
@@ -88,7 +88,7 @@ RxQueueAdvance(_In_ NETPACKETQUEUE queue)
     auto const fragEnd = context->fragmentRing->EndIndex;
     auto const descMask = context->descCount - 1u;
     UINT32 descIndex, pktIndex, fragIndex;
-    UINT32 donePkts = 0, queuedPkts = 0;
+    UINT32 ownDescriptors = 0, doneFrags = 0, queuedFrags = 0;
 
     /*
     Fragment indexes:
@@ -127,6 +127,7 @@ RxQueueAdvance(_In_ NETPACKETQUEUE queue)
             TraceWrite("RxQueueAdvance-own", LEVEL_WARNING,
                 TraceLoggingUInt32(descIndex, "descIndex"),
                 TraceLoggingHexInt32(reinterpret_cast<UINT32 const*>(&descWrite)[3], "RDES3"));
+            ownDescriptors = 1;
             break;
         }
 
@@ -170,7 +171,7 @@ RxQueueAdvance(_In_ NETPACKETQUEUE queue)
 
         pktIndex = NetRingIncrementIndex(context->packetRing, pktIndex);
         fragIndex = NetRingIncrementIndex(context->fragmentRing, fragIndex);
-        donePkts += 1;
+        doneFrags += 1;
     }
 
     context->descBegin = descIndex;
@@ -207,7 +208,7 @@ RxQueueAdvance(_In_ NETPACKETQUEUE queue)
             context->descVirtual[descIndex].Read = descRead;
 
             fragIndex = NetRingIncrementIndex(context->fragmentRing, fragIndex);
-            queuedPkts += 1;
+            queuedFrags += 1;
         }
 
         // In some error cases, the device may stall until we write to the tail pointer
@@ -232,9 +233,12 @@ RxQueueAdvance(_In_ NETPACKETQUEUE queue)
         context->fragmentRing->BeginIndex = fragEnd;
     }
 
+    DeviceAddStatisticsRxQueue(context->deviceContext, ownDescriptors, doneFrags);
+
     TraceEntryExit(RxQueueAdvance, LEVEL_VERBOSE,
-        TraceLoggingUInt32(donePkts),
-        TraceLoggingUInt32(queuedPkts));
+        TraceLoggingUInt32(ownDescriptors),
+        TraceLoggingUInt32(doneFrags),
+        TraceLoggingUInt32(queuedFrags));
 }
 
 static EVT_PACKET_QUEUE_SET_NOTIFICATION_ENABLED RxQueueSetNotificationEnabled;
@@ -245,7 +249,7 @@ RxQueueSetNotificationEnabled(
 {
     // PASSIVE_LEVEL, nonpaged (resume path)
     auto const context = RxQueueGetContext(queue);
-    DeviceSetNotificationRxQueue(context->adapter, notificationEnabled ? queue : nullptr);
+    DeviceSetNotificationRxQueue(context->deviceContext, notificationEnabled ? queue : nullptr);
     TraceEntryExit(RxQueueSetNotificationEnabled, LEVEL_VERBOSE,
         TraceLoggingBoolean(notificationEnabled, "enabled"));
 }
@@ -278,7 +282,7 @@ RxQueueStop(_In_ NETPACKETQUEUE queue)
     PAGED_CODE();
     auto const context = RxQueueGetContext(queue);
 
-    DeviceSetNotificationRxQueue(context->adapter, nullptr);
+    DeviceSetNotificationRxQueue(context->deviceContext, nullptr);
 
     TraceEntryExit(RxQueueStop, LEVEL_INFO);
 }
@@ -300,7 +304,7 @@ RxQueueCleanup(_In_ WDFOBJECT queue)
 
 _Use_decl_annotations_ NTSTATUS
 RxQueueCreate(
-    NETADAPTER adapter,
+    DeviceContext* deviceContext,
     NETRXQUEUE_INIT* queueInit,
     WDFDMAENABLER dma,
     ChannelRegisters* channelRegs)
@@ -338,7 +342,7 @@ RxQueueCreate(
         auto const context = RxQueueGetContext(queue);
         context->channelRegs = channelRegs;
 
-        context->adapter = adapter;
+        context->deviceContext = deviceContext;
         context->packetRing = NetRingCollectionGetPacketRing(rings);
         context->fragmentRing = NetRingCollectionGetFragmentRing(rings);
         context->descCount = QueueDescriptorCount(context->fragmentRing->NumberOfElements);

@@ -3,6 +3,7 @@ Transmit queue behavior. Similar to the receive queue.
 */
 #pragma once
 
+struct DeviceContext;
 struct ChannelRegisters;
 struct MtlQueueRegisters;
 
@@ -11,7 +12,7 @@ _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 NTSTATUS
 TxQueueCreate(
-    _In_ NETADAPTER adapter,
+    _Inout_ DeviceContext* deviceContext,
     _Inout_ NETTXQUEUE_INIT* queueInit,
     _In_ WDFDMAENABLER dma,
     _Inout_ ChannelRegisters* channelRegs,

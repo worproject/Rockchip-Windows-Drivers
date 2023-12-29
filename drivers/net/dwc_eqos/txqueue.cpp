@@ -11,7 +11,7 @@ struct TxQueueContext
 {
     ChannelRegisters* channelRegs;
     MtlQueueRegisters* mtlRegs;
-    NETADAPTER adapter;
+    DeviceContext* deviceContext;
     NET_RING* packetRing;
     NET_RING* fragmentRing;
     WDFCOMMONBUFFER descBuffer;
@@ -87,7 +87,7 @@ TxQueueAdvance(_In_ NETPACKETQUEUE queue)
     auto const pktEnd = context->packetRing->EndIndex;
     auto const descMask = context->descCount - 1u;
     UINT32 descIndex, pktIndex, fragIndex;
-    UINT32 donePkts = 0, queuedPkts = 0, queuedFrags = 0;
+    UINT32 ownDescriptors = 0, doneFrags = 0, queuedFrags = 0;
 
     /*
     Packet indexes:
@@ -148,6 +148,7 @@ TxQueueAdvance(_In_ NETPACKETQUEUE queue)
                         TraceLoggingHexInt32(reinterpret_cast<UINT32 const*>(&descWrite)[3], "TDES3"),
                         TraceLoggingUInt32(i, "fragment"),
                         TraceLoggingUInt32(fragmentCount));
+                    ownDescriptors = 1;
                     goto DoneIndicating;
                 }
                 else if (
@@ -164,7 +165,7 @@ TxQueueAdvance(_In_ NETPACKETQUEUE queue)
                 }
             }
 
-            donePkts += 1;
+            doneFrags += fragmentCount;
             descReady -= fragmentCount;
             descIndex = (descIndex + fragmentCount) & descMask;
         }
@@ -243,8 +244,6 @@ DoneIndicating:
                 fragIndex = NetRingIncrementIndex(context->fragmentRing, fragIndex);
                 queuedFrags += 1;
             }
-
-            queuedPkts += 1;
         }
 
         pktIndex = NetRingIncrementIndex(context->packetRing, pktIndex);
@@ -259,9 +258,11 @@ DoneIndicating:
         context->packetRing->NextIndex = pktIndex;
     }
 
+    DeviceAddStatisticsTxQueue(context->deviceContext, ownDescriptors, doneFrags);
+
     TraceEntryExit(TxQueueAdvance, LEVEL_VERBOSE,
-        TraceLoggingUInt32(donePkts),
-        TraceLoggingUInt32(queuedPkts),
+        TraceLoggingUInt32(ownDescriptors),
+        TraceLoggingUInt32(doneFrags),
         TraceLoggingUInt32(queuedFrags));
 }
 
@@ -273,7 +274,7 @@ TxQueueSetNotificationEnabled(
 {
     // PASSIVE_LEVEL, nonpaged (resume path)
     auto const context = TxQueueGetContext(queue);
-    DeviceSetNotificationTxQueue(context->adapter, notificationEnabled ? queue : nullptr);
+    DeviceSetNotificationTxQueue(context->deviceContext, notificationEnabled ? queue : nullptr);
     TraceEntryExit(TxQueueSetNotificationEnabled, LEVEL_VERBOSE,
         TraceLoggingBoolean(notificationEnabled, "enabled"));
 }
@@ -371,7 +372,7 @@ TxQueueStop(_In_ NETPACKETQUEUE queue)
 
     context->descBegin = 0;
     context->descEnd = 0;
-    DeviceSetNotificationTxQueue(context->adapter, nullptr);
+    DeviceSetNotificationTxQueue(context->deviceContext, nullptr);
 
     TraceEntryExit(TxQueueStop, LEVEL_INFO);
 }
@@ -393,7 +394,7 @@ TxQueueCleanup(_In_ WDFOBJECT queue)
 
 _Use_decl_annotations_ NTSTATUS
 TxQueueCreate(
-    NETADAPTER adapter,
+    DeviceContext* deviceContext,
     NETTXQUEUE_INIT* queueInit,
     WDFDMAENABLER dma,
     ChannelRegisters* channelRegs,
@@ -432,7 +433,7 @@ TxQueueCreate(
         auto const context = TxQueueGetContext(queue);
         context->channelRegs = channelRegs;
         context->mtlRegs = mtlRegs;
-        context->adapter = adapter;
+        context->deviceContext = deviceContext;
         context->packetRing = NetRingCollectionGetPacketRing(rings);
         context->fragmentRing = NetRingCollectionGetFragmentRing(rings);
         context->descCount = QueueDescriptorCount(context->fragmentRing->NumberOfElements);

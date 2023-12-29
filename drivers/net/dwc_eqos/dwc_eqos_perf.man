@@ -434,6 +434,42 @@
             type="perf_counter_rawcount"
             uri="uri:opensource/dwc_eqos/perf/debug/DpcFatalBusError"
             />
+          <counter
+            detailLevel="standard"
+            field="RxOwnDescriptors"
+            id="7"
+            name="RxOwnDescriptors"
+            nameID="274"
+            type="perf_counter_rawcount"
+            uri="uri:opensource/dwc_eqos/perf/debug/RxOwnDescriptors"
+            />
+          <counter
+            detailLevel="standard"
+            field="RxDoneFragments"
+            id="8"
+            name="RxDoneFragments"
+            nameID="276"
+            type="perf_counter_rawcount"
+            uri="uri:opensource/dwc_eqos/perf/debug/RxDoneFragments"
+            />
+          <counter
+            detailLevel="standard"
+            field="TxOwnDescriptors"
+            id="9"
+            name="TxOwnDescriptors"
+            nameID="278"
+            type="perf_counter_rawcount"
+            uri="uri:opensource/dwc_eqos/perf/debug/TxOwnDescriptors"
+            />
+          <counter
+            detailLevel="standard"
+            field="TxDoneFragments"
+            id="10"
+            name="TxDoneFragments"
+            nameID="280"
+            type="perf_counter_rawcount"
+            uri="uri:opensource/dwc_eqos/perf/debug/TxDoneFragments"
+            />
         </counterSet>
 
       </provider>

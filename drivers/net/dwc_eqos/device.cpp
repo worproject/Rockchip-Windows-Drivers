@@ -80,6 +80,10 @@ struct DeviceContext
     UINT32 dpcTx; // Updated only in DPC.
     UINT32 dpcAbnormalStatus; // Updated only in DPC.
     UINT32 dpcFatalBusError; // Updated only in DPC.
+    UINT32 rxOwnDescriptors; // Updated only during RxQueueAdvance.
+    UINT32 rxDoneFragments; // Updated only during RxQueueAdvance.
+    UINT32 txOwnDescriptors; // Updated only during TxQueueAdvance.
+    UINT32 txDoneFragments; // Updated only during TxQueueAdvance.
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(DeviceContext, DeviceGetContext)
 
@@ -416,7 +420,7 @@ AdapterCreateTxQueue(
     auto const context = DeviceGetContext(AdapterGetContext(adapter)->device);
     NT_ASSERT(context->txQueue == nullptr);
     return TxQueueCreate(
-        adapter,
+        context,
         queueInit,
         context->dma,
         &context->regs->Dma_Ch[0],
@@ -433,7 +437,7 @@ AdapterCreateRxQueue(
     auto const context = DeviceGetContext(AdapterGetContext(adapter)->device);
     NT_ASSERT(context->rxQueue == nullptr);
     return RxQueueCreate(
-        adapter,
+        context,
         queueInit,
         context->dma,
         &context->regs->Dma_Ch[0]);
@@ -993,13 +997,13 @@ DeviceReleaseHardware(
     return STATUS_SUCCESS;
 }
 
+_IRQL_requires_max_(PASSIVE_LEVEL)
 void
 DeviceSetNotificationRxQueue(
-    _In_ NETADAPTER adapter,
+    _Inout_ DeviceContext* context,
     _In_opt_ NETPACKETQUEUE rxQueue)
 {
     // PASSIVE_LEVEL, nonpaged (resume path, raises IRQL)
-    auto const context = DeviceGetContext(AdapterGetContext(adapter)->device);
 
     WdfSpinLockAcquire(context->queueLock); // PASSIVE_LEVEL --> DISPATCH_LEVEL
     context->rxQueue = rxQueue;
@@ -1015,13 +1019,13 @@ DeviceSetNotificationRxQueue(
     }
 }
 
+_IRQL_requires_max_(PASSIVE_LEVEL)
 void
 DeviceSetNotificationTxQueue(
-    _In_ NETADAPTER adapter,
+    _Inout_ DeviceContext* context,
     _In_opt_ NETPACKETQUEUE txQueue)
 {
     // PASSIVE_LEVEL, nonpaged (resume path, raises IRQL)
-    auto const context = DeviceGetContext(AdapterGetContext(adapter)->device);
 
     WdfSpinLockAcquire(context->queueLock); // PASSIVE_LEVEL --> DISPATCH_LEVEL
     context->txQueue = txQueue;
@@ -1036,6 +1040,30 @@ DeviceSetNotificationTxQueue(
         DeviceInterruptDisable(context, InterruptsTx);
     }
 
+}
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void
+DeviceAddStatisticsRxQueue(
+    _Inout_ DeviceContext* context,
+    UINT32 ownDescriptors,
+    UINT32 doneFragments)
+{
+    // DISPATCH_LEVEL
+    context->rxOwnDescriptors += ownDescriptors;
+    context->rxDoneFragments += doneFragments;
+}
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void
+DeviceAddStatisticsTxQueue(
+    _Inout_ DeviceContext* context,
+    UINT32 ownDescriptors,
+    UINT32 doneFragments)
+{
+    // DISPATCH_LEVEL
+    context->txOwnDescriptors += ownDescriptors;
+    context->txDoneFragments += doneFragments;
 }
 
 __declspec(code_seg("PAGE"))
@@ -1235,6 +1263,10 @@ PerfDataInit(
     data->DpcTx = context->dpcTx;
     data->DpcAbnormalStatus = context->dpcAbnormalStatus;
     data->DpcFatalBusError = context->dpcFatalBusError;
+    data->RxOwnDescriptors = context->rxOwnDescriptors;
+    data->RxDoneFragments = context->rxDoneFragments;
+    data->TxOwnDescriptors = context->txOwnDescriptors;
+    data->TxDoneFragments = context->txDoneFragments;
 }
 
 // Implements the performance counter callback for a given DataType.
@@ -1291,6 +1323,7 @@ PerfCallback(
     return STATUS_SUCCESS;
 }
 
+_IRQL_requires_max_(PASSIVE_LEVEL)
 __declspec(code_seg("INIT"))
 void
 DevicePerfRegister(_In_ WDFDRIVER driver)
@@ -1340,6 +1373,7 @@ Done:
     TraceEntryExitWithStatus(DevicePerfRegister, LEVEL_INFO, status);
 }
 
+_IRQL_requires_max_(PASSIVE_LEVEL)
 __declspec(code_seg("PAGE"))
 void
 DevicePerfUnregister()
