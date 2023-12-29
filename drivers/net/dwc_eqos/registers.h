@@ -303,8 +303,8 @@ union MtlTxOperationMode_t
         MtlTxQueueEnable_t QueueEnable : 2; // TXQEN
         UINT32 ThresholdControl : 3; // TTC
         UINT32 Reserved7 : 9;
-        UINT32 QueueSize : 6; // TQS
-        UINT32 Reserved22 : 10;
+        UINT32 QueueSize : 12; // TQS
+        UINT32 Reserved28 : 4;
     };
 };
 
@@ -341,8 +341,7 @@ union MtlRxOperationMode_t
         UINT32 HardwareFlowControl : 1; // EHFC
         UINT32 FlowControlActivate : 6; // RFA
         UINT32 FlowControlDeactivate : 6; // RFD
-        UINT32 QueueSize : 7; // RQS
-        UINT32 Reserved27 : 5;
+        UINT32 QueueSize : 12; // RQS
     };
 };
 

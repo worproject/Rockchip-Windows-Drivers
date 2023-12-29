@@ -504,6 +504,13 @@ DeviceD0Entry(
 
     // TX configuration.
 
+    UINT32 const txFifoSize =
+        context->feature1.TxFifoSize > 23 ? 0x80000000 // Probably can't happen.
+        : 128u << context->feature1.TxFifoSize; // RK3588 has 16KB.
+    UINT32 const txQueueSize =
+        txFifoSize / QueuesSupported > 0x100000 ? 0x100000 // QueueSize field can express up to 1MB (assuming that 6 Reserved bits are actually QueueSize).
+        : txFifoSize / QueuesSupported;
+
     MacTxFlowCtrl_t txFlowCtrl = {};
     txFlowCtrl.TransmitFlowControlEnable = true;
     txFlowCtrl.PauseTime = 0xFFFF;
@@ -512,10 +519,22 @@ DeviceD0Entry(
     MtlTxOperationMode_t txOperationMode = {};
     txOperationMode.StoreAndForward = true;
     txOperationMode.QueueEnable = MtlTxQueueEnable_Enabled;
-    txOperationMode.QueueSize = (128u << context->feature1.TxFifoSize) / 256u - 1; // Use 100% of FIFO. (TODO: Not sure about the -1.)
+    txOperationMode.QueueSize = txQueueSize / 256u - 1;
     Write32(&context->regs->Mtl_Q[0].Tx_Operation_Mode, txOperationMode);
 
     // RX configuration.
+
+    UINT32 const rxFifoSize =
+        context->feature1.RxFifoSize > 23 ? 0x80000000 // Probably can't happen.
+        : 128u << context->feature1.RxFifoSize; // RK3588 has 32KB.
+    UINT32 const rxQueueSize =
+        rxFifoSize / QueuesSupported > 0x100000 ? 0x100000 // QueueSize field can express up to 1MB (assuming that the 5 Reserved bits are actually QueueSize).
+        : rxFifoSize / QueuesSupported;
+    UINT32 const rxFlowControlActivate =
+        rxQueueSize < 65536 ? rxQueueSize / 2u  // Limited queue: pause when 1/2 remains.
+        : 32768u;                               // Large queue: pause when 32KB remains.
+    UINT32 const rxFlowControlDeactivate =
+        rxFlowControlActivate + rxFlowControlActivate / 2u; // Unpause when 3/4 or 48KB remains.
 
     Write32(&context->regs->Mac_Rx_Flow_Ctrl, 0x3); // Rx flow control, pause packet detect.
     Write32(&context->regs->Mac_RxQ_Ctrl0, 0x2); // RxQ0 enabled for DCB/generic.
@@ -524,10 +543,10 @@ DeviceD0Entry(
     rxOperationMode.StoreAndForward = true;
     rxOperationMode.ForwardErrorPackets = true;
     rxOperationMode.ForwardUndersizedGoodPackets = true;
-    rxOperationMode.QueueSize = (128u << context->feature1.RxFifoSize) / 256u - 1; // Use 100% of FIFO. (TODO: Not sure about the -1.)
-    rxOperationMode.HardwareFlowControl = true;
-    rxOperationMode.FlowControlActivate = 2; // Full - 2KB. (TODO: Tune.)
-    rxOperationMode.FlowControlDeactivate = 10; // Full - 6KB. (TODO: Tune.)
+    rxOperationMode.QueueSize = rxQueueSize / 256u - 1;
+    rxOperationMode.HardwareFlowControl = rxQueueSize >= 2048;
+    rxOperationMode.FlowControlActivate = (rxFlowControlActivate / 512u) - 2u;
+    rxOperationMode.FlowControlDeactivate = (rxFlowControlDeactivate / 512u) - 2u;
     Write32(&context->regs->Mtl_Q[0].Rx_Operation_Mode, rxOperationMode);
 
     // MAC configuration.
@@ -546,7 +565,11 @@ DeviceD0Entry(
     DeviceInterruptEnable(context, InterruptsState);
 
     TraceEntryExitWithStatus(DeviceD0Entry, LEVEL_INFO, status,
-        TraceLoggingUInt32(previousState));
+        TraceLoggingUInt32(previousState),
+        TraceLoggingHexInt32(txQueueSize),
+        TraceLoggingHexInt32(rxQueueSize),
+        TraceLoggingHexInt32(rxFlowControlActivate),
+        TraceLoggingHexInt32(rxFlowControlDeactivate));
     return status;
 }
 
@@ -903,12 +926,12 @@ DevicePrepareHardware(
         busMode.UnlockOnPacket = false; // false = Wake for any received packet, true = only wake for magic packet.
         busMode.AxiMaxWriteOutstanding = DefaultAxiMaxWriteOutstanding;
         busMode.AxiMaxReadOutstanding = DefaultAxiMaxReadOutstanding;
-        busMode.AddressAlignedBeats = false; // ?
+        busMode.AddressAlignedBeats = true; // Seemed to have fewer Rx FIFO overflows with this set to true.
         busMode.AutoAxiLpi = true;      // true = enter LPI after (Axi_Lpi_Entry_Interval + 1) * 64 idle clocks.
-        busMode.BurstLength16 = true;   // true = allow 16-beat fixed-bursts.
-        busMode.BurstLength8 = true;    // true = allow 8-beat fixed-bursts.
-        busMode.BurstLength4 = true;    // true = allow 4-beat fixed-bursts.
-        busMode.FixedBurst = true;      // true = fixed-burst, false = mixed-burst (changes meaning of bits 1..7).
+        busMode.BurstLength16 = true;   // true = allow 16-beat bursts.
+        busMode.BurstLength8 = true;    // true = allow 8-beat bursts.
+        busMode.BurstLength4 = true;    // true = allow 4-beat bursts.
+        busMode.FixedBurst = true;     // true = fixed-burst, false = mixed-burst.
         Write32(&regs->Dma_SysBus_Mode, busMode);
 
         Write32(&regs->Mac_1us_Tic_Counter, DefaultCsrRate / 1'000'000u - 1);
