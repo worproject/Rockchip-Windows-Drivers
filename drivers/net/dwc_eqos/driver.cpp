@@ -5,7 +5,7 @@
 /*
 TODO list:
 - Support for 10/100 Mbps modes (requires ACPI support).
-- Use ACPI to get DMA configuration.
+- Use ACPI to get AXI configuration (and/or tune AXI config).
 - Jumbo frames.
 - Receive queue memory optimization?
 - Configuration in registry (e.g. flow control).
