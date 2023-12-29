@@ -23,6 +23,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="device.h" />
+    <ClInclude Include="dwc_eqos_perf_data.h" />
     <ClInclude Include="queue_common.h" />
     <ClInclude Include="registers.h" />
     <ClInclude Include="rxqueue.h" />
@@ -98,6 +99,17 @@
     <Link>
       <AdditionalDependencies>$(DDK_LIB_PATH)Ksecdd.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <Ctrpp>
+      <GenerateHeaderFileForCounter>false</GenerateHeaderFileForCounter>
+      <GenerateResourceSourceFile>true</GenerateResourceSourceFile>
+      <GeneratedCounterFilesPath>
+      </GeneratedCounterFilesPath>
+      <HeaderFileNameForProvider>$(IntDir)%(Filename).h</HeaderFileNameForProvider>
+      <ResourceFileName>$(IntDir)%(Filename).rc</ResourceFileName>
+    </Ctrpp>
+    <PostBuildEvent>
+      <Command>copy /y dwc_eqos_perf.man "$(OutDir)"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
     <ClCompile>
@@ -111,9 +123,28 @@
     <Link>
       <AdditionalDependencies>$(DDK_LIB_PATH)Ksecdd.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <Ctrpp>
+      <GenerateHeaderFileForCounter>false</GenerateHeaderFileForCounter>
+      <GenerateResourceSourceFile>true</GenerateResourceSourceFile>
+      <GeneratedCounterFilesPath>
+      </GeneratedCounterFilesPath>
+      <HeaderFileNameForProvider>$(IntDir)%(Filename).h</HeaderFileNameForProvider>
+      <ResourceFileName>$(IntDir)%(Filename).rc</ResourceFileName>
+    </Ctrpp>
+    <PostBuildEvent>
+      <Command>copy /y dwc_eqos_perf.man "$(OutDir)"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <FilesToPackage Include="$(TargetPath)" />
+  </ItemGroup>
+  <ItemGroup>
+    <Ctrpp Include="dwc_eqos_perf.man">
+      <FileType>Manifest</FileType>
+    </Ctrpp>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="dwc_eqos.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

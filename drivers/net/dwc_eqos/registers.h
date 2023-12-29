@@ -559,7 +559,7 @@ enum HashTableSize_t : UINT32
 
 union MacConfiguration_t
 {
-    UINT32 Value32;
+    ULONG Value32;
     struct
     {
         UINT32 ReceiverEnable : 1;
@@ -1180,12 +1180,12 @@ struct MacRegisters
     // MMC_Rx_Interrupt_Mask @ 0x070C = 0x0:
     // This register maintains the masks for interrupts generated from all Receive
     // statistics counters.
-    ULONG Mmc_Rx_InterruptMask;
+    ULONG Mmc_Rx_Interrupt_Mask;
 
     // MMC_Tx_Interrupt_Mask @ 0x0710 = 0x0:
     // This register maintains the masks for interrupts generated from all Transmit
     // statistics counters.
-    ULONG Mmc_Tx_InterruptMask;
+    ULONG Mmc_Tx_Interrupt_Mask;
 
     // Tx_Octet_Count_Good_Bad @ 0x0714 = 0x0:
     // This register provides the number of bytes transmitted by the GMAC, exclusive
@@ -1397,15 +1397,15 @@ struct MacRegisters
     // Transmit statistics counters.
     ULONG Mmc_Fpe_Tx_Interrupt_Mask;
 
-    // MmcTxFpeFragment_Cntr @ 0x08A8 = 0x0:
+    // Mmc_Tx_Fpe_Fragment_Cntr @ 0x08A8 = 0x0:
     // This register provides the number of additional mPackets transmitted due to
     // preemption.
-    ULONG MmcTxFpeFragment_Cntr;
+    ULONG Mmc_Tx_Fpe_Fragment_Cntr;
 
-    // MMC_Tx_Hold_Req_Cntr @ 0x08AC = 0x0:
+    // Mmc_Tx_Hold_Req_Cntr @ 0x08AC = 0x0:
     // This register provides the count of number of times a hold request is given to
     // MAC.
-    ULONG MMC_Tx_Hold_Req_Cntr;
+    ULONG Mmc_Tx_Hold_Req_Cntr;
 
     ULONG Padding08B0[4];
 
@@ -1428,12 +1428,12 @@ struct MacRegisters
     // This register provides the number of received MAC frames rejected due to
     // unknown SMD value and MAC frame fragments rejected due to arriving with an
     // SMD-C when there was no.
-    ULONG Mmc_Rx_Packet_SMD_Err_Cntr;
+    ULONG Mmc_Rx_Packet_Smd_Err_Cntr;
 
     // MMC_Rx_Packet_Assembly_OK_Cntr @ 0x08D0 = 0x0:
     // This register provides the number of MAC frames that were successfully
     // reassembled and delivered to MAC.
-    ULONG MmcRxPacketAssemblyOkCntr;
+    ULONG Mmc_Rx_Packet_Assembly_OK_Cntr;
 
     // MMC_Rx_FPE_Fragment_Cntr @ 0x08D4 = 0x0:
     // This register provides the number of additional mPackets transmitted due to

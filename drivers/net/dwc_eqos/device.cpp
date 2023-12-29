@@ -5,6 +5,10 @@
 #include "queue_common.h"
 #include "registers.h"
 #include "trace.h"
+#include "dwc_eqos_perf_data.h"
+
+#define CTRPP_VERIFY_COUNTER_SIZES 1
+#include <dwc_eqos_perf.h>
 
 #include <bcrypt.h>
 
@@ -28,6 +32,10 @@ static auto constexpr QueuesSupported = 1u; // TODO: Support multiple queues?
 static auto constexpr InterruptLinkStatus = 0x80000000u;
 static auto constexpr InterruptChannel0Status = ~InterruptLinkStatus;
 
+// Updated by DevicePerfRegister/DevicePerfUnregister.
+static WDFWAITLOCK g_devicesLock = nullptr; // Guards g_devices.
+static WDFCOLLECTION g_devices = nullptr;   // Guarded by g_devicesLock.
+
 enum InterruptsWanted : UCHAR
 {
     InterruptsNone  = 0,
@@ -47,6 +55,7 @@ struct DeviceContext
     WDFSPINLOCK queueLock;
     WDFINTERRUPT interrupt;
     WDFDMAENABLER dma;
+    UINT32 perfCounterDeviceId; // = (regs physical address) >> 4
     MacHwFeature0_t feature0;
     MacHwFeature1_t feature1;
     MacHwFeature2_t feature2;
@@ -71,6 +80,10 @@ struct DeviceContext
     UINT32 dpcTx; // Updated only in DPC.
     UINT32 dpcAbnormalStatus; // Updated only in DPC.
     UINT32 dpcFatalBusError; // Updated only in DPC.
+    UINT32 rxOwnDescriptors; // Updated only during RxQueueAdvance.
+    UINT32 rxDoneFragments; // Updated only during RxQueueAdvance.
+    UINT32 txOwnDescriptors; // Updated only during TxQueueAdvance.
+    UINT32 txDoneFragments; // Updated only during TxQueueAdvance.
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(DeviceContext, DeviceGetContext)
 
@@ -407,7 +420,7 @@ AdapterCreateTxQueue(
     auto const context = DeviceGetContext(AdapterGetContext(adapter)->device);
     NT_ASSERT(context->txQueue == nullptr);
     return TxQueueCreate(
-        adapter,
+        context,
         queueInit,
         context->dma,
         &context->regs->Dma_Ch[0],
@@ -424,7 +437,7 @@ AdapterCreateRxQueue(
     auto const context = DeviceGetContext(AdapterGetContext(adapter)->device);
     NT_ASSERT(context->rxQueue == nullptr);
     return RxQueueCreate(
-        adapter,
+        context,
         queueInit,
         context->dma,
         &context->regs->Dma_Ch[0]);
@@ -632,6 +645,7 @@ DevicePrepareHardware(
         for (ULONG i = 0; i != resourcesCount; i += 1)
         {
             auto desc = WdfCmResourceListGetDescriptor(resourcesTranslated, i);
+            auto descRaw = WdfCmResourceListGetDescriptor(resourcesRaw, i);
             switch (desc->Type)
             {
             case CmResourceTypeMemory:
@@ -660,6 +674,8 @@ DevicePrepareHardware(
                         status = STATUS_INSUFFICIENT_RESOURCES;
                         goto Done;
                     }
+
+                    context->perfCounterDeviceId = static_cast<UINT32>(descRaw->u.Memory.Start.QuadPart >> 4);
                 }
                 break;
 
@@ -672,7 +688,7 @@ DevicePrepareHardware(
 
                     WDF_INTERRUPT_CONFIG config;
                     WDF_INTERRUPT_CONFIG_INIT(&config, DeviceInterruptIsr, DeviceInterruptDpc);
-                    config.InterruptRaw = WdfCmResourceListGetDescriptor(resourcesRaw, i);
+                    config.InterruptRaw = descRaw;
                     config.InterruptTranslated = desc;
 
                     status = WdfInterruptCreate(device, &config, WDF_NO_OBJECT_ATTRIBUTES, &context->interrupt);
@@ -880,22 +896,25 @@ DevicePrepareHardware(
             goto Done;
         }
 
-        // TODO: use ACPI _DSD?
-        // TODO: review. This is what the NetBSD driver seems to be doing, and
-        // it seems to work ok, but it doesn't line up with the documentation.
+        // TODO: tune? use ACPI _DSD?
+        Write32(&regs->Axi_Lpi_Entry_Interval, 15); // AutoAxiLpi after (interval + 1) * 64 clocks. Max value is 15.
         auto busMode = Read32(&regs->Dma_SysBus_Mode);
-        busMode.Reserved14 = true; // mixed-burst?
-        busMode.FixedBurst = false;
+        busMode.EnableLpi = true;       // true = allow LPI, honor AXI LPI request.
+        busMode.UnlockOnPacket = false; // false = Wake for any received packet, true = only wake for magic packet.
         busMode.AxiMaxWriteOutstanding = DefaultAxiMaxWriteOutstanding;
         busMode.AxiMaxReadOutstanding = DefaultAxiMaxReadOutstanding;
-        busMode.BurstLength16 = true;
-        busMode.BurstLength8 = true;
-        busMode.BurstLength4 = true;
+        busMode.AddressAlignedBeats = false; // ?
+        busMode.AutoAxiLpi = true;      // true = enter LPI after (Axi_Lpi_Entry_Interval + 1) * 64 idle clocks.
+        busMode.BurstLength16 = true;   // true = allow 16-beat fixed-bursts.
+        busMode.BurstLength8 = true;    // true = allow 8-beat fixed-bursts.
+        busMode.BurstLength4 = true;    // true = allow 4-beat fixed-bursts.
+        busMode.FixedBurst = true;      // true = fixed-burst, false = mixed-burst (changes meaning of bits 1..7).
         Write32(&regs->Dma_SysBus_Mode, busMode);
 
         Write32(&regs->Mac_1us_Tic_Counter, DefaultCsrRate / 1'000'000u - 1);
 
-        static_assert(sizeof(RxDescriptor) == sizeof(TxDescriptor));
+        static_assert(sizeof(RxDescriptor) == sizeof(TxDescriptor),
+            "RxDescriptor must be same size as TxDescriptor.");
         static_assert(sizeof(RxDescriptor) % BusBytes == 0,
             "RxDescriptor must be a multiple of bus width.");
         ChannelDmaControl_t dmaControl = {};
@@ -903,7 +922,12 @@ DevicePrepareHardware(
         dmaControl.PblX8 = QueueBurstLengthX8;
         Write32(&regs->Dma_Ch[0].Control, dmaControl);
 
-        Write32(&regs->Mmc_Control, 0x9); // Reset and freeze MMC counters because they generate interrupts.
+        // Disable MMC counter interrupts.
+        Write32(&regs->Mmc_Rx_Interrupt_Mask, 0xFFFFFFFF);  // RXWDOGP,RXFOVP,RXPAUSP,RXLENERP,RXOSIZEGP,RXCRCERP,RXMCGP,RXGOCT,RXGBOCT,RXGBPKT
+        Write32(&regs->Mmc_Tx_Interrupt_Mask, 0xFFFFFFFF);  // TXPAUSP,TXGPKT,TXGOCT,TXCARERP,TXUFLOWERP,TXGBPKT,TXGBOCT
+        Write32(&regs->Mmc_Ipc_Rx_Interrupt_Mask, 0xFFFFFFFF);
+        Write32(&regs->Mmc_Fpe_Tx_Interrupt_Mask, 0xFFFFFFFF);
+        Write32(&regs->Mmc_Fpe_Rx_Interrupt_Mask, 0xFFFFFFFF);
     }
 
     // Start adapter.
@@ -973,13 +997,13 @@ DeviceReleaseHardware(
     return STATUS_SUCCESS;
 }
 
+_IRQL_requires_max_(PASSIVE_LEVEL)
 void
 DeviceSetNotificationRxQueue(
-    _In_ NETADAPTER adapter,
+    _Inout_ DeviceContext* context,
     _In_opt_ NETPACKETQUEUE rxQueue)
 {
     // PASSIVE_LEVEL, nonpaged (resume path, raises IRQL)
-    auto const context = DeviceGetContext(AdapterGetContext(adapter)->device);
 
     WdfSpinLockAcquire(context->queueLock); // PASSIVE_LEVEL --> DISPATCH_LEVEL
     context->rxQueue = rxQueue;
@@ -995,13 +1019,13 @@ DeviceSetNotificationRxQueue(
     }
 }
 
+_IRQL_requires_max_(PASSIVE_LEVEL)
 void
 DeviceSetNotificationTxQueue(
-    _In_ NETADAPTER adapter,
+    _Inout_ DeviceContext* context,
     _In_opt_ NETPACKETQUEUE txQueue)
 {
     // PASSIVE_LEVEL, nonpaged (resume path, raises IRQL)
-    auto const context = DeviceGetContext(AdapterGetContext(adapter)->device);
 
     WdfSpinLockAcquire(context->queueLock); // PASSIVE_LEVEL --> DISPATCH_LEVEL
     context->txQueue = txQueue;
@@ -1016,6 +1040,43 @@ DeviceSetNotificationTxQueue(
         DeviceInterruptDisable(context, InterruptsTx);
     }
 
+}
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void
+DeviceAddStatisticsRxQueue(
+    _Inout_ DeviceContext* context,
+    UINT32 ownDescriptors,
+    UINT32 doneFragments)
+{
+    // DISPATCH_LEVEL
+    context->rxOwnDescriptors += ownDescriptors;
+    context->rxDoneFragments += doneFragments;
+}
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void
+DeviceAddStatisticsTxQueue(
+    _Inout_ DeviceContext* context,
+    UINT32 ownDescriptors,
+    UINT32 doneFragments)
+{
+    // DISPATCH_LEVEL
+    context->txOwnDescriptors += ownDescriptors;
+    context->txDoneFragments += doneFragments;
+}
+
+__declspec(code_seg("PAGE"))
+static void
+DeviceCleanup(WDFOBJECT Object)
+{
+    PAGED_CODE();
+    if (g_devices)
+    {
+        WdfWaitLockAcquire(g_devicesLock, nullptr);
+        WdfCollectionRemove(g_devices, Object);
+        WdfWaitLockRelease(g_devicesLock);
+    }
 }
 
 __declspec(code_seg("PAGE"))
@@ -1056,6 +1117,7 @@ DeviceAdd(
     {
         WDF_OBJECT_ATTRIBUTES attributes;
         WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attributes, DeviceContext);
+        attributes.EvtCleanupCallback = DeviceCleanup;
 
         status = WdfDeviceCreate(&deviceInit, &attributes, &device);
         if (!NT_SUCCESS(status))
@@ -1063,6 +1125,13 @@ DeviceAdd(
             TraceWrite("WdfDeviceCreate-failed", LEVEL_ERROR,
                 TraceLoggingNTStatus(status));
             goto Done;
+        }
+
+        if (g_devices)
+        {
+            WdfWaitLockAcquire(g_devicesLock, nullptr);
+            (void)WdfCollectionAdd(g_devices, device); // Best-effort.
+            WdfWaitLockRelease(g_devicesLock);
         }
 
         WdfDeviceSetAlignmentRequirement(device, FILE_BYTE_ALIGNMENT);
@@ -1127,4 +1196,202 @@ Done:
 
     TraceEntryExitWithStatus(DeviceAdd, LEVEL_INFO, status);
     return status;
+}
+
+// Performance counter implementation: extract PERF_MAC_DATA from DeviceContext.
+_IRQL_requires_max_(APC_LEVEL)
+__declspec(code_seg("PAGE"))
+static void
+PerfDataInit(
+    _In_ DeviceContext* context,
+    _Out_ PERF_MAC_DATA* data)
+{
+    PAGED_CODE();
+
+    data->Mac_Configuration = READ_REGISTER_NOFENCE_ULONG(&context->regs->Mac_Configuration.Value32);
+#define READ_COUNTER(name) data->name = READ_REGISTER_NOFENCE_ULONG(&context->regs->name)
+    READ_COUNTER(Tx_Packet_Count_Good_Bad);
+    READ_COUNTER(Tx_Underflow_Error_Packets);
+    READ_COUNTER(Tx_Carrier_Error_Packets);
+    READ_COUNTER(Tx_Octet_Count_Good);
+    READ_COUNTER(Tx_Packet_Count_Good);
+    READ_COUNTER(Tx_Pause_Packets);
+    READ_COUNTER(Rx_Packets_Count_Good_Bad);
+    READ_COUNTER(Rx_Octet_Count_Good_Bad);
+    READ_COUNTER(Rx_Octet_Count_Good);
+    READ_COUNTER(Rx_Multicast_Packets_Good);
+    READ_COUNTER(Rx_Crc_Error_Packets);
+    READ_COUNTER(Rx_Oversize_Packets_Good);
+    READ_COUNTER(Rx_Length_Error_Packets);
+    READ_COUNTER(Rx_Pause_Packets);
+    READ_COUNTER(Rx_Fifo_Overflow_Packets);
+    READ_COUNTER(Rx_Watchdog_Error_Packets);
+    READ_COUNTER(RxIPv4_Good_Packets);
+    READ_COUNTER(RxIPv4_Header_Error_Packets);
+    READ_COUNTER(RxIPv6_Good_Packets);
+    READ_COUNTER(RxIPv6_Header_Error_Packets);
+    READ_COUNTER(RxUdp_Error_Packets);
+    READ_COUNTER(RxTcp_Error_Packets);
+    READ_COUNTER(RxIcmp_Error_Packets);
+    READ_COUNTER(RxIPv4_Header_Error_Octets);
+    READ_COUNTER(RxIPv6_Header_Error_Octets);
+    READ_COUNTER(RxUdp_Error_Octets);
+    READ_COUNTER(RxTcp_Error_Octets);
+    READ_COUNTER(RxIcmp_Error_Octets);
+    READ_COUNTER(Mmc_Tx_Fpe_Fragment_Cntr);
+    READ_COUNTER(Mmc_Tx_Hold_Req_Cntr);
+    READ_COUNTER(Mmc_Rx_Packet_Smd_Err_Cntr);
+    READ_COUNTER(Mmc_Rx_Packet_Assembly_OK_Cntr);
+    READ_COUNTER(Mmc_Rx_Fpe_Fragment_Cntr);
+#undef READ_COUNTER
+}
+
+// Performance counter implementation: extract PERF_DEBUG_DATA from DeviceContext.
+_IRQL_requires_max_(APC_LEVEL)
+__declspec(code_seg("PAGE"))
+static void
+PerfDataInit(
+    _In_ DeviceContext* context,
+    _Out_ PERF_DEBUG_DATA* data)
+{
+    PAGED_CODE();
+
+    data->IsrHandled = context->isrHandled;
+    data->IsrIgnored = context->isrIgnored;
+    data->DpcLinkState = context->dpcLinkState;
+    data->DpcRx = context->dpcRx;
+    data->DpcTx = context->dpcTx;
+    data->DpcAbnormalStatus = context->dpcAbnormalStatus;
+    data->DpcFatalBusError = context->dpcFatalBusError;
+    data->RxOwnDescriptors = context->rxOwnDescriptors;
+    data->RxDoneFragments = context->rxDoneFragments;
+    data->TxOwnDescriptors = context->txOwnDescriptors;
+    data->TxDoneFragments = context->txDoneFragments;
+}
+
+// Implements the performance counter callback for a given DataType.
+// Expects a PerfDataInit(DeviceContext*, DataType*) function to exist.
+template<class DataType>
+_IRQL_requires_max_(APC_LEVEL)
+__declspec(code_seg("PAGE"))
+static NTSTATUS NTAPI
+PerfCallback(
+    _In_ PCW_CALLBACK_TYPE type,
+    _In_ PCW_CALLBACK_INFORMATION* info,
+    _In_opt_ void* callbackContext)
+{
+    PAGED_CODE();
+    UNREFERENCED_PARAMETER(callbackContext);
+
+    if ((type == PcwCallbackEnumerateInstances || type == PcwCallbackCollectData) &&
+        g_devices != nullptr)
+    {
+        auto const buffer = type == PcwCallbackCollectData
+            ? info->CollectData.Buffer
+            : info->EnumerateInstances.Buffer;
+
+        DataType data = {};
+        wchar_t nameBuffer[8];
+        UNICODE_STRING nameString = {};
+        nameString.Buffer = nameBuffer;
+        nameString.Length = 0;
+        nameString.MaximumLength = sizeof(nameBuffer);
+
+        WdfWaitLockAcquire(g_devicesLock, nullptr);
+
+        auto const count = WdfCollectionGetCount(g_devices);
+        for (ULONG i = 0; i != count; i += 1)
+        {
+            auto const device = static_cast<WDFDEVICE>(WdfCollectionGetItem(g_devices, i));
+            auto const context = DeviceGetContext(device);
+
+            if (type == PcwCallbackCollectData)
+            {
+                PerfDataInit(context, &data);
+            }
+
+            RtlIntegerToUnicodeString(context->perfCounterDeviceId, 16, &nameString);
+
+            // Inline the ctrpp-generated AddXXX function:
+            PCW_DATA pcwData = { &data, sizeof(data) };
+            (void)PcwAddInstance(buffer, &nameString, context->perfCounterDeviceId, 1, &pcwData); // Best-effort.
+        }
+
+        WdfWaitLockRelease(g_devicesLock);
+    }
+
+    return STATUS_SUCCESS;
+}
+
+_IRQL_requires_max_(PASSIVE_LEVEL)
+__declspec(code_seg("INIT"))
+void
+DevicePerfRegister(_In_ WDFDRIVER driver)
+{
+    PAGED_CODE();
+    NT_ASSERT(g_devicesLock == nullptr);
+    NT_ASSERT(g_devices == nullptr);
+
+    // This is all best-effort.
+    // Driver should still run even if performance counters can't be registered.
+    NTSTATUS status;
+
+    WDF_OBJECT_ATTRIBUTES attributes;
+    WDF_OBJECT_ATTRIBUTES_INIT(&attributes);
+    attributes.ParentObject = driver;
+
+    status = WdfWaitLockCreate(&attributes, &g_devicesLock);
+    if (!NT_SUCCESS(status))
+    {
+        goto Done;
+    }
+
+    status = WdfCollectionCreate(&attributes, &g_devices);
+    if (!NT_SUCCESS(status))
+    {
+        goto Done;
+    }
+
+    status = RegisterPERF_MAC_COUNTERSET(PerfCallback<PERF_MAC_DATA>, nullptr);
+    if (!NT_SUCCESS(status))
+    {
+        TraceWrite("RegisterPERF_MAC_COUNTERSET", LEVEL_WARNING,
+            TraceLoggingNTStatus(status));
+    }
+
+    status = RegisterPERF_DEBUG_COUNTERSET(PerfCallback<PERF_DEBUG_DATA>, nullptr);
+    if (!NT_SUCCESS(status))
+    {
+        TraceWrite("RegisterPERF_DEBUG_COUNTERSET", LEVEL_WARNING,
+            TraceLoggingNTStatus(status));
+    }
+
+    status = STATUS_SUCCESS;
+
+Done:
+
+    TraceEntryExitWithStatus(DevicePerfRegister, LEVEL_INFO, status);
+}
+
+_IRQL_requires_max_(PASSIVE_LEVEL)
+__declspec(code_seg("PAGE"))
+void
+DevicePerfUnregister()
+{
+    PAGED_CODE();
+
+    UnregisterPERF_DEBUG_COUNTERSET();
+    UnregisterPERF_MAC_COUNTERSET();
+
+    if (g_devices)
+    {
+        WdfObjectDelete(g_devices);
+        g_devices = nullptr;
+    }
+
+    if (g_devicesLock)
+    {
+        WdfObjectDelete(g_devicesLock);
+        g_devicesLock = nullptr;
+    }
 }
