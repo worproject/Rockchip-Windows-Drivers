@@ -857,24 +857,22 @@ union DmaSysBusMode_t
     UINT32 Value32;
     struct
     {
-        UINT32 FixedBurst : 1; // FB - Fixed Burst Length
-        UINT32 BurstLength4 : 1; // BLEN4 - AXI Burst Length 4
-        UINT32 BurstLength8 : 1; // BLEN8 - AXI Burst Length 8
-        UINT32 BurstLength16 : 1; // BLEN16 - AXI Burst Length 16
-        UINT32 Reserved4 : 6;
-        UINT32 AutoAxiLpi : 1; // AAL - Auto AXI LPI
-        UINT32 Reserved11 : 1;
-        UINT32 AddressAlignedBeats : 1; // AAL - Address Aligned Beats
-        UINT32 Reserved13 : 1;
-        UINT32 Reserved14 : 1; // mixed-burst?
-        UINT32 Reserved15 : 1;
+        UINT8 FixedBurst : 1; // FB - 0 = mixed-burst, 1 = fixed-burst
+        UINT8 BurstLengths : 7; // BLEN4 .. BLEN256 - AXI Burst Length enable bits
+        UINT8 Reserved4 : 2;
+        UINT8 AutoAxiLpi : 1; // AAL - Auto AXI LPI
+        UINT8 Reserved11 : 1;
+        UINT8 AddressAlignedBeats : 1; // AAL - Address Aligned Beats
+        UINT8 Reserved13 : 1;
+        UINT8 Reserved14 : 1; // ??? NetBSD sets this to 1 for mixed-burst.
+        UINT8 Reserved15 : 1;
 
-        UINT32 AxiMaxReadOutstanding : 4; // RD_OSR_LMT - AXI Maximum Read Outstanding Request Limit
-        UINT32 Reserved20 : 4;
-        UINT32 AxiMaxWriteOutstanding : 4; // WR_OSR_LMT - AXI Maximum Write Outstanding Request Limit
-        UINT32 Reserved28 : 2;
-        UINT32 UnlockOnPacket : 1; // LPI_XIT_PKT - Unlock on Magic/Remote Wake-up Packet
-        UINT32 EnableLpi : 1; // EN_LPI - Enable Low Power Interface (LPI)
+        UINT8 AxiMaxReadOutstanding : 4; // RD_OSR_LMT - AXI Maximum Read Outstanding Request Limit
+        UINT8 Reserved20 : 4;
+        UINT8 AxiMaxWriteOutstanding : 4; // WR_OSR_LMT - AXI Maximum Write Outstanding Request Limit
+        UINT8 Reserved28 : 2;
+        UINT8 UnlockOnPacket : 1; // LPI_XIT_PKT - Unlock on Magic/Remote Wake-up Packet
+        UINT8 EnableLpi : 1; // EN_LPI - Enable Low Power Interface (LPI)
     };
 };
 

@@ -20,7 +20,8 @@ struct TxQueueContext
     NET_EXTENSION packetChecksum;
     NET_EXTENSION fragmentLogical;
     UINT32 descCount;   // A power of 2 between QueueDescriptorMinCount and QueueDescriptorMaxCount.
-    bool checksumOffloadEnabled;
+    UINT8 txPbl;
+    bool txChecksumOffload;
 
     UINT32 descBegin;   // Start of the TRANSMIT region.
     UINT32 descEnd;     // End of the TRANSMIT region, start of the EMPTY region.
@@ -72,7 +73,7 @@ TxQueueStart(_In_ NETPACKETQUEUE queue)
     ChannelTxControl_t txControl = {};
     txControl.Start = true;
     txControl.OperateOnSecondPacket = true;
-    txControl.TxPbl = QueueBurstLength;
+    txControl.TxPbl = context->txPbl;
     Write32(&context->channelRegs->Tx_Control, txControl);
 
     TraceEntryExit(TxQueueStart, LEVEL_INFO);
@@ -187,6 +188,7 @@ DoneIndicating:
     pktIndex = pktNext;
 
     // Number of EMPTY is (descBegin-1) - descEnd, wrapping around if necessary.
+    auto const txChecksumOffload = context->txChecksumOffload;
     auto const descEnd = context->descEnd;
     auto descEmpty = ((context->descBegin - 1) - descEnd) & descMask;
     descIndex = descEnd;
@@ -208,7 +210,7 @@ DoneIndicating:
             // NetExtensionGetPacketChecksum because device.cpp didn't call
             // NetAdapterOffloadSetTxChecksumCapabilities.
             // If offload is disabled by software then the extension will be zeroed.
-            auto const checksum = context->checksumOffloadEnabled
+            auto const checksum = txChecksumOffload
                 ? *NetExtensionGetPacketChecksum(&context->packetChecksum, pktIndex)
                 : NET_PACKET_CHECKSUM{}; // Disabled by hardware.
             auto const checksumInsertion =
@@ -410,11 +412,11 @@ TxQueueCleanup(_In_ WDFOBJECT queue)
 _Use_decl_annotations_ NTSTATUS
 TxQueueCreate(
     DeviceContext* deviceContext,
+    DeviceConfig const& deviceConfig,
     NETTXQUEUE_INIT* queueInit,
     WDFDMAENABLER dma,
     ChannelRegisters* channelRegs,
-    MtlQueueRegisters* mtlRegs,
-    bool checksumOffloadEnabled)
+    MtlQueueRegisters* mtlRegs)
 {
     // PASSIVE_LEVEL, nonpaged (resume path)
     NTSTATUS status;
@@ -453,7 +455,8 @@ TxQueueCreate(
         context->packetRing = NetRingCollectionGetPacketRing(rings);
         context->fragmentRing = NetRingCollectionGetFragmentRing(rings);
         context->descCount = QueueDescriptorCount(context->fragmentRing->NumberOfElements);
-        context->checksumOffloadEnabled = checksumOffloadEnabled;
+        context->txPbl = deviceConfig.txPbl;
+        context->txChecksumOffload = deviceConfig.txCoeSel;
 
         TraceWrite("TxQueueCreate-size", LEVEL_VERBOSE,
             TraceLoggingHexInt32(context->packetRing->NumberOfElements, "packets"),
@@ -486,7 +489,7 @@ TxQueueCreate(
 
         NET_EXTENSION_QUERY query;
 
-        if (context->checksumOffloadEnabled)
+        if (context->txChecksumOffload)
         {
             NET_EXTENSION_QUERY_INIT(&query,
                 NET_PACKET_EXTENSION_CHECKSUM_NAME,

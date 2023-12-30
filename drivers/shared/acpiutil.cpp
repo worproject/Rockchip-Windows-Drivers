@@ -21,13 +21,7 @@
 //
 
 #include <Ntddk.h>
-
-extern "C" {
-    #include <acpiioct.h>
-    #include <initguid.h>
-} // extern "C"
-
-#include "acpiutil.hpp"
+#include <acpiutil.hpp>
 
 #define ASSERT_MAX_IRQL(IRQL) NT_ASSERT(KeGetCurrentIrql() <= (IRQL))
 
@@ -90,18 +84,10 @@ AcpiFormatDsmFunctionInputBuffer(
     _In_ const GUID* GuidPtr,
     _In_ UINT32 RevisionId,
     _In_ UINT32 FunctionIdx,
-    _In_ ACPI_METHOD_ARGUMENT* FunctionArgumentsPtr,
+    _In_reads_bytes_(FunctionArgumentsSize) ACPI_METHOD_ARGUMENT* FunctionArgumentsPtr,
     _In_ USHORT FunctionArgumentsSize,
     _Outptr_result_bytebuffer_(*InputBufferSizePtr) ACPI_EVAL_INPUT_BUFFER_COMPLEX** InputBufferPptr,
     _Out_ UINT32* InputBufferSizePtr);
-
-_IRQL_requires_max_(APC_LEVEL)
-NTSTATUS
-AcpiEvaluateMethod(
-    _In_ DEVICE_OBJECT* PdoPtr,
-    _In_reads_bytes_(InputBufferSize) ACPI_EVAL_INPUT_BUFFER* InputBufferPtr,
-    _In_ UINT32 InputBufferSize,
-    _Outptr_result_bytebuffer_((*ReturnBufferPptr)->Length) ACPI_EVAL_OUTPUT_BUFFER UNALIGNED** ReturnBufferPptr);
 
 //
 // Internal Enumeration
@@ -565,7 +551,8 @@ AcpiSendIoctlSynchronously(
     irpPtr->IoStatus.Information = 0;
     irpPtr->UserBuffer = nullptr;
 
-    IO_STACK_LOCATION* irpStackPtr = IoGetNextIrpStackLocation(irpPtr);
+    IO_STACK_LOCATION* irpStackPtr;
+    irpStackPtr = IoGetNextIrpStackLocation(irpPtr);
     NT_ASSERT(irpStackPtr != nullptr);
     irpStackPtr->MajorFunction = IRP_MJ_DEVICE_CONTROL;
     irpStackPtr->Parameters.DeviceIoControl.IoControlCode = IoControlCode;
@@ -981,7 +968,8 @@ AcpiFormatDsmFunctionInputBuffer(
     //
     // Argument 0: UUID
     //
-    ACPI_METHOD_ARGUMENT UNALIGNED* argumentPtr = &inputBufferPtr->Argument[0];
+    ACPI_METHOD_ARGUMENT UNALIGNED* argumentPtr;
+    argumentPtr = &inputBufferPtr->Argument[0];
     ACPI_METHOD_SET_ARGUMENT_BUFFER(argumentPtr, GuidPtr, sizeof(GUID));
 
     //

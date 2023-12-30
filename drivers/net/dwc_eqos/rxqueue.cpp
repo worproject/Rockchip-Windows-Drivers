@@ -20,6 +20,7 @@ struct RxQueueContext
     NET_EXTENSION packetChecksum;
     NET_EXTENSION fragmentLogical;
     UINT32 descCount;   // A power of 2 between QueueDescriptorMinCount and QueueDescriptorMaxCount.
+    UINT8 rxPbl;
     bool running;
 
     UINT32 descBegin;   // Start of the RECEIVE region.
@@ -73,7 +74,7 @@ RxQueueStart(_In_ NETPACKETQUEUE queue)
     ChannelRxControl_t rxControl = {};
     rxControl.Start = true;
     rxControl.ReceiveBufferSize = RxBufferSize;
-    rxControl.RxPbl = QueueBurstLength;
+    rxControl.RxPbl = context->rxPbl;
     Write32(&context->channelRegs->Rx_Control, rxControl);
 
     TraceEntryExit(RxQueueStart, LEVEL_INFO);
@@ -339,6 +340,7 @@ RxQueueCleanup(_In_ WDFOBJECT queue)
 _Use_decl_annotations_ NTSTATUS
 RxQueueCreate(
     DeviceContext* deviceContext,
+    DeviceConfig const& deviceConfig,
     NETRXQUEUE_INIT* queueInit,
     WDFDMAENABLER dma,
     ChannelRegisters* channelRegs)
@@ -380,6 +382,7 @@ RxQueueCreate(
         context->packetRing = NetRingCollectionGetPacketRing(rings);
         context->fragmentRing = NetRingCollectionGetFragmentRing(rings);
         context->descCount = QueueDescriptorCount(context->fragmentRing->NumberOfElements);
+        context->rxPbl = deviceConfig.rxPbl;
 
         TraceWrite("RxQueueCreate-size", LEVEL_VERBOSE,
             TraceLoggingHexInt32(context->packetRing->NumberOfElements, "packets"),

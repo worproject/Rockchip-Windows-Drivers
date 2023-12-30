@@ -10,6 +10,7 @@
 #define CTRPP_VERIFY_COUNTER_SIZES 1
 #include <dwc_eqos_perf.h>
 
+#include <acpiutil.hpp>
 #include <bcrypt.h>
 
 /*
@@ -24,8 +25,6 @@ CreateTxQueue       DestroyCallback
 (DisarmWake)        (ArmWake)
 */
 
-static auto constexpr DefaultAxiMaxWriteOutstanding = 4u;
-static auto constexpr DefaultAxiMaxReadOutstanding = 8u;
 static auto constexpr DefaultCsrRate = 125'000'000u;
 static auto constexpr BusBytes = 8u;
 static auto constexpr QueuesSupported = 1u; // TODO: Support multiple queues?
@@ -62,6 +61,7 @@ struct DeviceContext
     MacHwFeature3_t feature3;
     UINT8 permanentMacAddress[ETHERNET_LENGTH_OF_ADDRESS];
     UINT8 currentMacAddress[ETHERNET_LENGTH_OF_ADDRESS];
+    DeviceConfig config;
 
     // Mutable.
 
@@ -421,11 +421,11 @@ AdapterCreateTxQueue(
     NT_ASSERT(context->txQueue == nullptr);
     return TxQueueCreate(
         context,
+        context->config,
         queueInit,
         context->dma,
         &context->regs->Dma_Ch[0],
-        &context->regs->Mtl_Q[0],
-        context->feature0.TxChecksumOffload != 0);
+        &context->regs->Mtl_Q[0]);
 }
 
 static EVT_NET_ADAPTER_CREATE_RXQUEUE AdapterCreateRxQueue;
@@ -439,6 +439,7 @@ AdapterCreateRxQueue(
     NT_ASSERT(context->rxQueue == nullptr);
     return RxQueueCreate(
         context,
+        context->config,
         queueInit,
         context->dma,
         &context->regs->Dma_Ch[0]);
@@ -591,7 +592,7 @@ DeviceD0Entry(
     macConfig.PacketBurstEnable = true;
     macConfig.ReceiverEnable = true;
     macConfig.TransmitterEnable = true;
-    macConfig.ChecksumOffloadEnable = context->feature0.TxChecksumOffload | context->feature0.RxChecksumOffload;
+    macConfig.ChecksumOffloadEnable = context->config.txCoeSel || context->config.rxCoeSel;
     Write32(&context->regs->Mac_Configuration, macConfig);
 
     // Clear and then enable interrupts.
@@ -855,6 +856,169 @@ DevicePrepareHardware(
         }
     }
 
+    // Device Config
+
+    {
+        context->config.txCoeSel = context->feature0.TxChecksumOffload;
+        context->config.rxCoeSel = context->feature0.RxChecksumOffload;
+        context->config.pblX8 = true;
+        context->config.pbl = 8;
+        context->config.txPbl = context->config.pbl;
+        context->config.rxPbl = context->config.pbl;
+        context->config.fixed_burst = false;
+        context->config.mixed_burst = true;
+        context->config.wr_osr_lmt = 4;
+        context->config.rd_osr_lmt = 8;
+        context->config.blen = 0x7; // 0x7 = 4, 8, 16
+
+        auto const deviceObject = WdfDeviceWdmGetPhysicalDevice(device);
+        PACPI_EVAL_OUTPUT_BUFFER outputBuffer = nullptr;
+        ACPI_METHOD_ARGUMENT const UNALIGNED* properties = nullptr;
+        ACPI_METHOD_ARGUMENT const UNALIGNED* blenProperties = nullptr;
+        UINT32 valueI32;
+        UINT32 valueLength;
+
+        status = AcpiQueryDsd(deviceObject, &outputBuffer);
+        if (!NT_SUCCESS(status))
+        {
+            TraceWrite("AcpiQueryDsd-failed", LEVEL_WARNING,
+                TraceLoggingNTStatus(status));
+            goto DeviceConfigDone;
+        }
+
+        status = AcpiParseDsdAsDeviceProperties(outputBuffer, &properties);
+        if (!NT_SUCCESS(status))
+        {
+            TraceWrite("AcpiParseDsdAsDeviceProperties-DSD-failed", LEVEL_WARNING,
+                TraceLoggingNTStatus(status));
+            goto DeviceConfigDone;
+        }
+
+        status = AcpiDevicePropertiesQueryIntegerValue(properties, "snps,pblx8", &valueI32);
+        if (NT_SUCCESS(status) && valueI32 <= 1)
+        {
+            context->config.pblX8 = valueI32 != 0;
+        }
+
+        status = AcpiDevicePropertiesQueryIntegerValue(properties, "snps,pbl", &valueI32);
+        if (NT_SUCCESS(status) && valueI32 <= 0x3F)
+        {
+            context->config.pbl = static_cast<UINT8>(valueI32);
+            context->config.txPbl = context->config.pbl;
+            context->config.rxPbl = context->config.pbl;
+        }
+
+        status = AcpiDevicePropertiesQueryIntegerValue(properties, "snps,txpbl", &valueI32);
+        if (NT_SUCCESS(status) && valueI32 <= 0x3F)
+        {
+            context->config.txPbl = static_cast<UINT8>(valueI32);
+        }
+
+        status = AcpiDevicePropertiesQueryIntegerValue(properties, "snps,rxpbl", &valueI32);
+        if (NT_SUCCESS(status) && valueI32 <= 0x3F)
+        {
+            context->config.rxPbl = static_cast<UINT8>(valueI32);
+        }
+
+        status = AcpiDevicePropertiesQueryIntegerValue(properties, "snps,fixed-burst", &valueI32);
+        if (NT_SUCCESS(status) && valueI32 <= 1)
+        {
+            context->config.fixed_burst = valueI32 != 0;
+        }
+
+        status = AcpiDevicePropertiesQueryIntegerValue(properties, "snps,mixed-burst", &valueI32);
+        if (NT_SUCCESS(status) && valueI32 <= 1)
+        {
+            context->config.mixed_burst = valueI32 != 0;
+        }
+
+        CHAR valueString[5];
+        status = AcpiDevicePropertiesQueryStringValue(properties, "snps,axi-config", sizeof(valueString), &valueLength, valueString);
+        if (!NT_SUCCESS(status) || valueLength != 5)
+        {
+            goto DeviceConfigDone;
+        }
+
+        ExFreePoolWithTag(outputBuffer, ACPI_TAG_EVAL_OUTPUT_BUFFER);
+        outputBuffer = nullptr;
+
+        ACPI_EVAL_INPUT_BUFFER inputBuffer;
+        inputBuffer = {};
+        inputBuffer.Signature = ACPI_EVAL_INPUT_BUFFER_SIGNATURE;
+
+        memcpy(inputBuffer.MethodName, valueString, sizeof(inputBuffer.MethodName));
+        status = AcpiEvaluateMethod(deviceObject, &inputBuffer, sizeof(ACPI_EVAL_INPUT_BUFFER), &outputBuffer);
+        if (!NT_SUCCESS(status))
+        {
+            TraceWrite("AcpiEvaluateMethod-AXIC-failed", LEVEL_WARNING,
+                TraceLoggingNTStatus(status));
+            goto DeviceConfigDone;
+        }
+
+        status = AcpiParseDsdAsDeviceProperties(outputBuffer, &properties);
+        if (!NT_SUCCESS(status))
+        {
+            TraceWrite("AcpiParseDsdAsDeviceProperties-AXIC-failed", LEVEL_WARNING,
+                TraceLoggingNTStatus(status));
+            goto DeviceConfigDone;
+        }
+
+        status = AcpiDevicePropertiesQueryIntegerValue(properties, "snps,wr_osr_lmt", &valueI32);
+        if (NT_SUCCESS(status) && valueI32 <= 0x0F)
+        {
+            context->config.wr_osr_lmt = static_cast<UINT8>(valueI32);
+        }
+
+        status = AcpiDevicePropertiesQueryIntegerValue(properties, "snps,rd_osr_lmt", &valueI32);
+        if (NT_SUCCESS(status) && valueI32 <= 0x0F)
+        {
+            context->config.rd_osr_lmt = static_cast<UINT8>(valueI32);
+        }
+
+        status = AcpiDevicePropertiesQueryValue(properties, "snps,blen", &blenProperties);
+        if (NT_SUCCESS(status) && blenProperties->Type == ACPI_METHOD_ARGUMENT_PACKAGE)
+        {
+            UINT8 blen = 0;
+            unsigned count = 0;
+
+            for (ACPI_METHOD_ARGUMENT const UNALIGNED* blenVal = nullptr;;)
+            {
+                status = AcpiPackageGetNextArgument(blenProperties, &blenVal);
+                if (!NT_SUCCESS(status) ||
+                    blenVal->Type != ACPI_METHOD_ARGUMENT_INTEGER ||
+                    blenVal->DataLength != sizeof(UINT32))
+                {
+                    break;
+                }
+
+                count += 1;
+                switch (blenVal->Argument)
+                {
+                case 4: blen |= 0x1; break;
+                case 8: blen |= 0x2; break;
+                case 16: blen |= 0x4; break;
+                case 32: blen |= 0x8; break;
+                case 64: blen |= 0x10; break;
+                case 128: blen |= 0x20; break;
+                case 256: blen |= 0x40; break;
+                }
+            }
+
+            if (count != 0)
+            {
+                context->config.blen = blen;
+            }
+        }
+
+    DeviceConfigDone:
+
+        if (outputBuffer)
+        {
+            ExFreePoolWithTag(outputBuffer, ACPI_TAG_EVAL_OUTPUT_BUFFER);
+            outputBuffer = nullptr;
+        }
+    }
+
     // Create DMA enabler
 
     {
@@ -943,7 +1107,7 @@ DevicePrepareHardware(
             NetPacketFilterFlagPromiscuous;
         NetAdapterSetReceiveFilterCapabilities(context->adapter, &rxFilterCaps);
 
-        if (context->feature0.TxChecksumOffload)
+        if (context->config.txCoeSel)
         {
             NET_ADAPTER_OFFLOAD_TX_CHECKSUM_CAPABILITIES txChecksumCaps;
             NET_ADAPTER_OFFLOAD_TX_CHECKSUM_CAPABILITIES_INIT(&txChecksumCaps, {}, AdapterOffloadSetTxChecksum);
@@ -981,14 +1145,14 @@ DevicePrepareHardware(
         auto busMode = Read32(&regs->Dma_SysBus_Mode);
         busMode.EnableLpi = true;       // true = allow LPI, honor AXI LPI request.
         busMode.UnlockOnPacket = false; // false = Wake for any received packet, true = only wake for magic packet.
-        busMode.AxiMaxWriteOutstanding = DefaultAxiMaxWriteOutstanding;
-        busMode.AxiMaxReadOutstanding = DefaultAxiMaxReadOutstanding;
+        busMode.AxiMaxWriteOutstanding = context->config.wr_osr_lmt;
+        busMode.AxiMaxReadOutstanding = context->config.rd_osr_lmt;
+        busMode.Reserved14 = context->config.mixed_burst; // ??? This is what the NetBSD driver does.
         busMode.AddressAlignedBeats = true; // Seemed to have fewer Rx FIFO overflows with this set to true.
         busMode.AutoAxiLpi = true;      // true = enter LPI after (Axi_Lpi_Entry_Interval + 1) * 64 idle clocks.
-        busMode.BurstLength16 = true;   // true = allow 16-beat bursts.
-        busMode.BurstLength8 = true;    // true = allow 8-beat bursts.
-        busMode.BurstLength4 = true;    // true = allow 4-beat bursts.
-        busMode.FixedBurst = true;     // true = fixed-burst, false = mixed-burst.
+        busMode.BurstLengths = context->config.blen;
+
+        busMode.FixedBurst = context->config.fixed_burst;
         Write32(&regs->Dma_SysBus_Mode, busMode);
 
         Write32(&regs->Mac_1us_Tic_Counter, DefaultCsrRate / 1'000'000u - 1);
@@ -999,7 +1163,7 @@ DevicePrepareHardware(
             "RxDescriptor must be a multiple of bus width.");
         ChannelDmaControl_t dmaControl = {};
         dmaControl.DescriptorSkipLength = (sizeof(RxDescriptor) - 16) / BusBytes;
-        dmaControl.PblX8 = QueueBurstLengthX8;
+        dmaControl.PblX8 = context->config.pblX8;
         Write32(&regs->Dma_Ch[0].Control, dmaControl);
 
         // Disable MMC counter interrupts.
