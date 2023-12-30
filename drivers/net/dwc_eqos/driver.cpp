@@ -9,7 +9,6 @@ TODO list:
 - Jumbo frames.
 - Receive queue memory optimization?
 - Configuration in registry (e.g. flow control).
-- Checksum offload.
 - Tx segmentation offload.
 - Rx segmentation offload.
 - Wake-on-LAN.

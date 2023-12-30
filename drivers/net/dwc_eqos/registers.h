@@ -1735,7 +1735,6 @@ constexpr unsigned DESCRIPTOR_ALIGN = 64u;
 #define RX_DESCRIPTOR_SIZE 16
 #endif
 
-
 enum TxChecksumInsertion : UINT16
 {
     TxChecksumInsertionDisabled = 0,
@@ -1937,6 +1936,18 @@ struct RxDescriptorRead
 };
 static_assert(sizeof(RxDescriptorRead) == RX_DESCRIPTOR_SIZE);
 
+enum RxPayloadType : UINT8
+{
+    RxPayloadTypeUnknown = 0,
+    RxPayloadTypeUdp,
+    RxPayloadTypeTcp,
+    RxPayloadTypeIcmp,
+    RxPayloadTypeIgmp,
+    RxPayloadTypeAvUntaggedControl,
+    RxPayloadTypeAvTaggedData,
+    RxPayloadTypeAvTaggedControl,
+};
+
 struct RxDescriptorWrite
 {
     // RDES0
@@ -1946,7 +1957,7 @@ struct RxDescriptorWrite
 
     // RDES1
 
-    UINT8 PayloadType : 3; // PT
+    RxPayloadType PayloadType : 3; // PT
     UINT8 IPHeaderError : 1; // IPHE
     UINT8 IPv4HeaderPresent : 1; // IPV4
     UINT8 IPv6HeaderPresent : 1; // IPV6

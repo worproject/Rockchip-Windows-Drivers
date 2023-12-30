@@ -424,7 +424,8 @@ AdapterCreateTxQueue(
         queueInit,
         context->dma,
         &context->regs->Dma_Ch[0],
-        &context->regs->Mtl_Q[0]);
+        &context->regs->Mtl_Q[0],
+        context->feature0.TxChecksumOffload != 0);
 }
 
 static EVT_NET_ADAPTER_CREATE_RXQUEUE AdapterCreateRxQueue;
@@ -450,7 +451,6 @@ AdapterSetReceiveFilter(
     _In_ NETRECEIVEFILTER receiveFilter)
 {
     // PASSIVE_LEVEL, nonpaged (resume path)
-    TraceEntry(AdapterSetReceiveFilter, LEVEL_INFO);
     auto const context = DeviceGetContext(AdapterGetContext(adapter)->device);
 
     auto const flags = NetReceiveFilterGetPacketFilter(receiveFilter);
@@ -487,9 +487,43 @@ AdapterSetReceiveFilter(
 
     Write32(&context->regs->Mac_Packet_Filter, filter);
 
-    TraceExit(AdapterSetReceiveFilter, LEVEL_INFO,
+    TraceEntryExit(AdapterSetReceiveFilter, LEVEL_INFO,
         TraceLoggingHexInt32(flags),
         TraceLoggingUIntPtr(mcastCount));
+}
+
+static EVT_NET_ADAPTER_OFFLOAD_SET_TX_CHECKSUM AdapterOffloadSetTxChecksum;
+static void
+AdapterOffloadSetTxChecksum(
+    _In_ NETADAPTER adapter,
+    _In_ NETOFFLOAD offload)
+{
+    // PASSIVE_LEVEL, nonpaged (resume path)
+    UNREFERENCED_PARAMETER(adapter);
+    auto const IPv4 = NetOffloadIsTxChecksumIPv4Enabled(offload);
+    auto const Tcp = NetOffloadIsTxChecksumTcpEnabled(offload);
+    auto const Udp = NetOffloadIsTxChecksumUdpEnabled(offload);
+    TraceEntryExit(AdapterOffloadSetTxChecksum, LEVEL_INFO,
+        TraceLoggingBoolean(IPv4),
+        TraceLoggingBoolean(Tcp),
+        TraceLoggingBoolean(Udp));
+}
+
+static EVT_NET_ADAPTER_OFFLOAD_SET_RX_CHECKSUM AdapterOffloadSetRxChecksum;
+static void
+AdapterOffloadSetRxChecksum(
+    _In_ NETADAPTER adapter,
+    _In_ NETOFFLOAD offload)
+{
+    // PASSIVE_LEVEL, nonpaged (resume path)
+    UNREFERENCED_PARAMETER(adapter);
+    auto const IPv4 = NetOffloadIsRxChecksumIPv4Enabled(offload);
+    auto const Tcp = NetOffloadIsRxChecksumTcpEnabled(offload);
+    auto const Udp = NetOffloadIsRxChecksumUdpEnabled(offload);
+    TraceEntryExit(AdapterOffloadSetRxChecksum, LEVEL_INFO,
+        TraceLoggingBoolean(IPv4),
+        TraceLoggingBoolean(Tcp),
+        TraceLoggingBoolean(Udp));
 }
 
 static EVT_WDF_DEVICE_D0_ENTRY DeviceD0Entry;
@@ -541,7 +575,8 @@ DeviceD0Entry(
 
     MtlRxOperationMode_t rxOperationMode = {};
     rxOperationMode.StoreAndForward = true;
-    rxOperationMode.ForwardErrorPackets = true;
+    rxOperationMode.DisableDropTcpChecksumError = true;
+    rxOperationMode.ForwardErrorPackets = false;
     rxOperationMode.ForwardUndersizedGoodPackets = true;
     rxOperationMode.QueueSize = rxQueueSize / 256u - 1;
     rxOperationMode.HardwareFlowControl = rxQueueSize >= 2048;
@@ -556,6 +591,7 @@ DeviceD0Entry(
     macConfig.PacketBurstEnable = true;
     macConfig.ReceiverEnable = true;
     macConfig.TransmitterEnable = true;
+    macConfig.ChecksumOffloadEnable = context->feature0.TxChecksumOffload | context->feature0.RxChecksumOffload;
     Write32(&context->regs->Mac_Configuration, macConfig);
 
     // Clear and then enable interrupts.
@@ -906,6 +942,27 @@ DevicePrepareHardware(
             NetPacketFilterFlagBroadcast |
             NetPacketFilterFlagPromiscuous;
         NetAdapterSetReceiveFilterCapabilities(context->adapter, &rxFilterCaps);
+
+        if (context->feature0.TxChecksumOffload)
+        {
+            NET_ADAPTER_OFFLOAD_TX_CHECKSUM_CAPABILITIES txChecksumCaps;
+            NET_ADAPTER_OFFLOAD_TX_CHECKSUM_CAPABILITIES_INIT(&txChecksumCaps, {}, AdapterOffloadSetTxChecksum);
+            txChecksumCaps.Layer3Flags =
+                NetAdapterOffloadLayer3FlagIPv4NoOptions |
+                NetAdapterOffloadLayer3FlagIPv4WithOptions |
+                NetAdapterOffloadLayer3FlagIPv6NoExtensions |
+                NetAdapterOffloadLayer3FlagIPv6WithExtensions;
+            txChecksumCaps.Layer4Flags =
+                NetAdapterOffloadLayer4FlagTcpNoOptions |
+                NetAdapterOffloadLayer4FlagTcpWithOptions |
+                NetAdapterOffloadLayer4FlagUdp;
+            NetAdapterOffloadSetTxChecksumCapabilities(context->adapter, &txChecksumCaps);
+        }
+
+        NET_ADAPTER_OFFLOAD_RX_CHECKSUM_CAPABILITIES rxChecksumCaps;
+        NET_ADAPTER_OFFLOAD_RX_CHECKSUM_CAPABILITIES_INIT(&rxChecksumCaps,
+            AdapterOffloadSetRxChecksum);
+        NetAdapterOffloadSetRxChecksumCapabilities(context->adapter, &rxChecksumCaps);
     }
 
     // Initialize adapter.
@@ -983,34 +1040,6 @@ DeviceReleaseHardware(
     auto const context = DeviceGetContext(device);
     if (context->regs != nullptr)
     {
-#define CtxStat(x) TraceLoggingUInt32(context->x, #x)
-#define RegStat(x) TraceLoggingUInt32(Read32(&context->regs->x), #x)
-
-        TraceWrite("DeviceReleaseHardware-MacStats", LEVEL_INFO,
-            CtxStat(isrHandled),
-            CtxStat(isrIgnored),
-            CtxStat(dpcLinkState),
-            CtxStat(dpcRx),
-            CtxStat(dpcTx),
-            CtxStat(dpcAbnormalStatus),
-            CtxStat(dpcFatalBusError));
-
-#if 0 // MMC frozen for now
-        TraceWrite("DeviceReleaseHardware-TxStats", LEVEL_INFO,
-            RegStat(TxPacketCountGoodBad),
-            RegStat(TxUnderflowErrorPackets),
-            RegStat(TxCarrierErrorPackets),
-            RegStat(TxPacketCountGood),
-            RegStat(TxPausePackets));
-        TraceWrite("DeviceReleaseHardware-RxStats", LEVEL_INFO,
-            RegStat(RxPacketCountGoodBad),
-            RegStat(RxCrcErrorPackets),
-            RegStat(RxLengthErrorPackets),
-            RegStat(RxPausePackets),
-            RegStat(RxFifoOverflowPackets),
-            RegStat(RxWatchdogErrorPackets));
-#endif
-
         DeviceReset(context->regs, context->permanentMacAddress);
         MmUnmapIoSpace(context->regs, sizeof(*context->regs));
         context->regs = nullptr;
