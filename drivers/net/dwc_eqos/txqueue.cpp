@@ -17,8 +17,10 @@ struct TxQueueContext
     WDFCOMMONBUFFER descBuffer;
     TxDescriptor* descVirtual;
     PHYSICAL_ADDRESS descPhysical;
+    NET_EXTENSION packetChecksum;
     NET_EXTENSION fragmentLogical;
     UINT32 descCount;   // A power of 2 between QueueDescriptorMinCount and QueueDescriptorMaxCount.
+    bool checksumOffloadEnabled;
 
     UINT32 descBegin;   // Start of the TRANSMIT region.
     UINT32 descEnd;     // End of the TRANSMIT region, start of the EMPTY region.
@@ -202,6 +204,18 @@ DoneIndicating:
         {
             fragIndex = pkt->FragmentIndex;
 
+            // If checksum offload is disabled by hardware then we can't call
+            // NetExtensionGetPacketChecksum because device.cpp didn't call
+            // NetAdapterOffloadSetTxChecksumCapabilities.
+            // If offload is disabled by software then the extension will be zeroed.
+            auto const checksum = context->checksumOffloadEnabled
+                ? *NetExtensionGetPacketChecksum(&context->packetChecksum, pktIndex)
+                : NET_PACKET_CHECKSUM{}; // Disabled by hardware.
+            auto const checksumInsertion =
+                checksum.Layer4 ? TxChecksumInsertionEnabledIncludingPseudo
+                : checksum.Layer3 ? TxChecksumInsertionEnabledHeaderOnly
+                : TxChecksumInsertionDisabled;
+
             auto const fragmentCount = pkt->FragmentCount;
             NT_ASSERT(fragmentCount != 0);
             if (fragmentCount > descEmpty)
@@ -229,8 +243,9 @@ DoneIndicating:
                 descRead.Buf2Ap = static_cast<UINT32>(fragLogicalAddress >> 32);
                 NT_ASSERT(frag->ValidLength <= 0x3FFF); // 14 bits
                 descRead.Buf1Length = frag->ValidLength & 0x3FFF;
-                descRead.InterruptOnCompletion = true;
+                descRead.InterruptOnCompletion = i == fragmentCount - 1u;
                 descRead.FrameLength = static_cast<UINT16>(frameLength);
+                descRead.ChecksumInsertion = checksumInsertion;
                 descRead.LastDescriptor = i == fragmentCount - 1u;
                 descRead.FirstDescriptor = i == 0;
                 descRead.Own = true;
@@ -398,7 +413,8 @@ TxQueueCreate(
     NETTXQUEUE_INIT* queueInit,
     WDFDMAENABLER dma,
     ChannelRegisters* channelRegs,
-    MtlQueueRegisters* mtlRegs)
+    MtlQueueRegisters* mtlRegs,
+    bool checksumOffloadEnabled)
 {
     // PASSIVE_LEVEL, nonpaged (resume path)
     NTSTATUS status;
@@ -437,6 +453,7 @@ TxQueueCreate(
         context->packetRing = NetRingCollectionGetPacketRing(rings);
         context->fragmentRing = NetRingCollectionGetFragmentRing(rings);
         context->descCount = QueueDescriptorCount(context->fragmentRing->NumberOfElements);
+        context->checksumOffloadEnabled = checksumOffloadEnabled;
 
         TraceWrite("TxQueueCreate-size", LEVEL_VERBOSE,
             TraceLoggingHexInt32(context->packetRing->NumberOfElements, "packets"),
@@ -468,6 +485,16 @@ TxQueueCreate(
             TraceLoggingPointer(context->descVirtual, "virtual"));
 
         NET_EXTENSION_QUERY query;
+
+        if (context->checksumOffloadEnabled)
+        {
+            NET_EXTENSION_QUERY_INIT(&query,
+                NET_PACKET_EXTENSION_CHECKSUM_NAME,
+                NET_PACKET_EXTENSION_CHECKSUM_VERSION_1,
+                NetExtensionTypePacket);
+            NetTxQueueGetExtension(queue, &query, &context->packetChecksum);
+        }
+
         NET_EXTENSION_QUERY_INIT(&query,
             NET_FRAGMENT_EXTENSION_LOGICAL_ADDRESS_NAME,
             NET_FRAGMENT_EXTENSION_LOGICAL_ADDRESS_VERSION_1,

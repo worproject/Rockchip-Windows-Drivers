@@ -16,4 +16,5 @@ TxQueueCreate(
     _Inout_ NETTXQUEUE_INIT* queueInit,
     _In_ WDFDMAENABLER dma,
     _Inout_ ChannelRegisters* channelRegs,
-    _Inout_ MtlQueueRegisters* mtlRegs);
+    _Inout_ MtlQueueRegisters* mtlRegs,
+    bool checksumOffloadEnabled);

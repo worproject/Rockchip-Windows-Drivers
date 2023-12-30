@@ -17,6 +17,7 @@ struct RxQueueContext
     WDFCOMMONBUFFER descBuffer;
     RxDescriptor* descVirtual;
     PHYSICAL_ADDRESS descPhysical;
+    NET_EXTENSION packetChecksum;
     NET_EXTENSION fragmentLogical;
     UINT32 descCount;   // A power of 2 between QueueDescriptorMinCount and QueueDescriptorMaxCount.
     bool running;
@@ -167,6 +168,39 @@ RxQueueAdvance(_In_ NETPACKETQUEUE queue)
         {
             NT_ASSERT(descWrite.PacketLength >= 4); // PacketLength includes CRC
             frag->ValidLength = descWrite.PacketLength - 4;
+
+            // If checksum offload is disabled by hardware then no IP headers will be
+            // detected. If checksum offload is disabled by software then NetAdapterCx
+            // will ignore our evaluation.
+            if (descWrite.IPv4HeaderPresent | descWrite.IPv6HeaderPresent)
+            {
+                auto const checksum = NetExtensionGetPacketChecksum(&context->packetChecksum, pktIndex);
+                checksum->Layer2 = NetPacketRxChecksumEvaluationValid;
+                pkt->Layout.Layer2Type = NetPacketLayer2TypeEthernet;
+
+                checksum->Layer3 = descWrite.IPHeaderError
+                    ? NetPacketRxChecksumEvaluationInvalid
+                    : NetPacketRxChecksumEvaluationValid;
+                pkt->Layout.Layer3Type = descWrite.IPv4HeaderPresent
+                    ? NetPacketLayer3TypeIPv4UnspecifiedOptions
+                    : NetPacketLayer3TypeIPv6UnspecifiedExtensions;
+
+                checksum->Layer4 = descWrite.IPPayloadError
+                    ? NetPacketRxChecksumEvaluationInvalid
+                    : NetPacketRxChecksumEvaluationValid;
+                switch (descWrite.PayloadType)
+                {
+                case RxPayloadTypeUdp:
+                    pkt->Layout.Layer4Type = NetPacketLayer4TypeUdp;
+                    break;
+                case RxPayloadTypeTcp:
+                    pkt->Layout.Layer4Type = NetPacketLayer4TypeTcp;
+                    break;
+                default:
+                    pkt->Layout.Layer4Type = NetPacketLayer4TypeUnspecified;
+                    break;
+                }
+            }
         }
 
         pktIndex = NetRingIncrementIndex(context->packetRing, pktIndex);
@@ -377,6 +411,13 @@ RxQueueCreate(
             TraceLoggingPointer(context->descVirtual, "virtual"));
 
         NET_EXTENSION_QUERY query;
+
+        NET_EXTENSION_QUERY_INIT(&query,
+            NET_PACKET_EXTENSION_CHECKSUM_NAME,
+            NET_PACKET_EXTENSION_CHECKSUM_VERSION_1,
+            NetExtensionTypePacket);
+        NetRxQueueGetExtension(queue, &query, &context->packetChecksum);
+
         NET_EXTENSION_QUERY_INIT(&query,
             NET_FRAGMENT_EXTENSION_LOGICAL_ADDRESS_NAME,
             NET_FRAGMENT_EXTENSION_LOGICAL_ADDRESS_VERSION_1,
