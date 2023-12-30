@@ -7,9 +7,6 @@ UINT32 constexpr QueueDescriptorSize = 64; // 64 == sizeof(TxDescriptor) == size
 UINT32 constexpr QueueDescriptorMinCount = PAGE_SIZE / QueueDescriptorSize;
 UINT32 constexpr QueueDescriptorMaxCount = 0x400;
 
-bool constexpr QueueBurstLengthX8 = true;
-UINT32 constexpr QueueBurstLength = 64u / (QueueBurstLengthX8 ? 8 : 1); // TODO: load from ACPI?
-
 // Alignment is mainly to make sure the allocation does not cross a 4GB boundary,
 // but it also simplifies the QueueDescriptorAddressToIndex implementation.
 auto const QueueDescriptorAlignment = QueueDescriptorMaxCount * QueueDescriptorSize;

@@ -22,6 +22,8 @@
 
 #ifndef __ACPIUTIL_HPP__
 #define __ACPIUTIL_HPP__
+#pragma once
+#include <acpiioct.h>
 
 #define NONPAGED_SEGMENT_BEGIN \
     __pragma(code_seg(push)) \
@@ -112,7 +114,7 @@ _IRQL_requires_max_(PASSIVE_LEVEL)
 NTSTATUS
 AcpiQueryDsd(
     _In_ DEVICE_OBJECT* PdoPtr,
-    _Outptr_result_bytebuffer_((*DsdBufferPptr)->Length) ACPI_EVAL_OUTPUT_BUFFER UNALIGNED** DsdBufferPptr);
+    _Outptr_result_bytebuffer_maybenull_((*DsdBufferPptr)->Length) ACPI_EVAL_OUTPUT_BUFFER UNALIGNED** DsdBufferPptr);
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS
@@ -200,14 +202,22 @@ AcpiQueryDsm(
 
 _IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
+AcpiEvaluateMethod(
+    _In_ DEVICE_OBJECT* PdoPtr,
+    _In_reads_bytes_(InputBufferSize) ACPI_EVAL_INPUT_BUFFER* InputBufferPtr,
+    _In_ UINT32 InputBufferSize,
+    _Outptr_result_bytebuffer_maybenull_((*ReturnBufferPptr)->Length) ACPI_EVAL_OUTPUT_BUFFER UNALIGNED** ReturnBufferPptr);
+
+_IRQL_requires_max_(APC_LEVEL)
+NTSTATUS
 AcpiExecuteDsmFunction(
     _In_ DEVICE_OBJECT* PdoPtr,
     _In_reads_bytes_(sizeof(GUID)) const GUID* GuidPtr,
     _In_ UINT32 RevisionId,
     _In_ UINT32 FunctionIdx,
-    _In_opt_ ACPI_METHOD_ARGUMENT* FunctionArgumentsPtr,
+    _In_reads_bytes_(FunctionArgumentsSize) ACPI_METHOD_ARGUMENT* FunctionArgumentsPtr,
     _In_ USHORT FunctionArgumentsSize,
-    _Outptr_opt_result_bytebuffer_((*ReturnBufferPptr)->Length) ACPI_EVAL_OUTPUT_BUFFER UNALIGNED** ReturnBufferPptr);
+    _Outptr_opt_result_bytebuffer_maybenull_((*ReturnBufferPptr)->Length) ACPI_EVAL_OUTPUT_BUFFER UNALIGNED** ReturnBufferPptr);
 
 _IRQL_requires_same_
 NTSTATUS
