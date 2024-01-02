@@ -259,7 +259,7 @@ MakeChannelInterruptEnable(InterruptsWanted wanted)
     return interruptEnable;
 }
 
-_IRQL_requires_min_(DISPATCH_LEVEL) // Actually HIGH_LEVEL.
+_IRQL_requires_max_(HIGH_LEVEL)
 static void
 DeviceInterruptSet_Locked(_Inout_ MacRegisters* regs, InterruptsWanted wanted)
 {
@@ -643,12 +643,15 @@ DeviceD0Entry(
     macConfig.ChecksumOffloadEnable = context->config.txCoeSel || context->config.rxCoeSel;
     Write32(&context->regs->Mac_Configuration, macConfig);
 
-    // Clear and then enable interrupts.
+    // Clear any pending interrupts, then unmask them.
 
     NT_ASSERT(ReadNoFence8(&context->updateLinkStateBusy) == 0);
     UpdateLinkState(context); // Clears LinkStatus interrupt.
     Write32(&context->regs->Dma_Ch[0].Status, ChannelStatus_t(~0u));
-    DeviceInterruptEnable(context, InterruptsState);
+
+    NT_ASSERT(context->interruptsWanted == InterruptsNone);
+    context->interruptsWanted = InterruptsState;
+    DeviceInterruptSet_Locked(context->regs, InterruptsState); // Interrupts are disabled so interrupt lock is offline.
 
     TraceEntryExitWithStatus(DeviceD0Entry, LEVEL_INFO, status,
         TraceLoggingUInt32(previousState),
@@ -671,7 +674,9 @@ DeviceD0Exit(
     NTSTATUS status = STATUS_SUCCESS;
     auto const context = DeviceGetContext(device);
 
-    DeviceInterruptDisable(context, InterruptsAll);
+    DeviceInterruptSet_Locked(context->regs, InterruptsNone); // Interrupts are disabled so interrupt lock is offline.
+    context->interruptsWanted = InterruptsNone;
+
     WdfWorkItemFlush(context->updateLinkStateWorkItem);
     NT_ASSERT(ReadNoFence8(&context->updateLinkStateBusy) == 0);
 
