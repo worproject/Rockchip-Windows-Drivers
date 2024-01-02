@@ -54,6 +54,7 @@ struct DeviceContext
     WDFSPINLOCK queueLock;
     WDFINTERRUPT interrupt;
     WDFDMAENABLER dma;
+    WDFWORKITEM linkStateWorkItem;
     UINT32 perfCounterDeviceId; // = (regs physical address) >> 4
     MacHwFeature0_t feature0;
     MacHwFeature1_t feature1;
@@ -150,11 +151,11 @@ DeviceReset(_Inout_ MacRegisters* regs, _In_reads_(6) UINT8 const* mac0)
     return STATUS_TIMEOUT;
 }
 
-_IRQL_requires_max_(DISPATCH_LEVEL)
+_IRQL_requires_max_(PASSIVE_LEVEL)
 static void
 UpdateLinkState(_In_ DeviceContext const* context)
 {
-    // DISPATCH_LEVEL
+    // PASSIVE_LEVEL, nonpaged (resume path)
     auto const controlStatus = Read32(&context->regs->Mac_PhyIf_Control_Status); // Clears LinkStatus interrupt.
     auto const oldConfig = Read32(&context->regs->Mac_Configuration);
     auto newConfig = oldConfig;
@@ -387,7 +388,8 @@ DeviceInterruptDpc(
         if (newInterruptStatus.Value32 & InterruptLinkStatus)
         {
             context->dpcLinkState += 1;
-            UpdateLinkState(context); // Clears LinkStatus interrupt.
+            Read32(&context->regs->Mac_PhyIf_Control_Status); // Clears LinkStatus interrupt.
+            WdfWorkItemEnqueue(context->linkStateWorkItem);
         }
 
         if (newInterruptStatus.Rx || newInterruptStatus.Tx)
@@ -435,6 +437,17 @@ DeviceInterruptDpc(
         }
         WdfInterruptReleaseLock(context->interrupt); // HIGH_LEVEL --> DISPATCH_LEVEL
     }
+}
+
+static EVT_WDF_WORKITEM DeviceLinkStateWorkItem;
+static void
+DeviceLinkStateWorkItem(
+    _In_ WDFWORKITEM workItem)
+{
+    // PASSIVE_LEVEL, nonpaged (resume path)
+    auto const context = DeviceGetContext(WdfWorkItemGetParentObject(workItem));
+    NT_ASSERT(context->linkStateWorkItem == workItem);
+    UpdateLinkState(context);
 }
 
 static EVT_NET_ADAPTER_CREATE_TXQUEUE AdapterCreateTxQueue;
@@ -1405,7 +1418,7 @@ DeviceAdd(
         WdfDeviceSetDeviceState(device, &deviceState);
     }
 
-    // Create lock.
+    // Create device objects.
 
     {
         auto const context = DeviceGetContext(device);
@@ -1418,6 +1431,16 @@ DeviceAdd(
         if (!NT_SUCCESS(status))
         {
             TraceWrite("WdfSpinLockCreate-failed", LEVEL_ERROR,
+                TraceLoggingNTStatus(status));
+            goto Done;
+        }
+
+        WDF_WORKITEM_CONFIG workItemConfig;
+        WDF_WORKITEM_CONFIG_INIT(&workItemConfig, DeviceLinkStateWorkItem);
+        status = WdfWorkItemCreate(&workItemConfig, &attributes, &context->linkStateWorkItem);
+        if (!NT_SUCCESS(status))
+        {
+            TraceWrite("WdfWorkItemCreate-failed", LEVEL_ERROR,
                 TraceLoggingNTStatus(status));
             goto Done;
         }
