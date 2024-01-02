@@ -574,7 +574,7 @@ union MacConfiguration_t
         UINT32 EnableCarrierSenseBeforeTransmit : 1;
         UINT32 LoopbackMode : 1;
         UINT32 FullDuplex : 1;
-        PortSelectSpeed_t PortSelectSpeed : 2;
+        PortSelectSpeed_t PortSelectSpeed : 2; // Combines PS and FES.
 
         UINT32 JumboPacketEnable : 1;
         UINT32 JabberDisable : 1;

@@ -54,6 +54,7 @@ struct DeviceContext
     WDFSPINLOCK queueLock;
     WDFINTERRUPT interrupt;
     WDFDMAENABLER dma;
+    WDFWORKITEM linkStateWorkItem;
     UINT32 perfCounterDeviceId; // = (regs physical address) >> 4
     MacHwFeature0_t feature0;
     MacHwFeature1_t feature1;
@@ -62,6 +63,10 @@ struct DeviceContext
     UINT8 permanentMacAddress[ETHERNET_LENGTH_OF_ADDRESS];
     UINT8 currentMacAddress[ETHERNET_LENGTH_OF_ADDRESS];
     DeviceConfig config;
+
+    // TODO: call ACPI to change phy clock speed.
+    UINT8 php_grf_clk_con1_gmac_shift; // 0 for GMAC0, 5 for GMAC1.
+    UINT32* php_grf_clk_con1_regs;
 
     // Mutable.
 
@@ -146,37 +151,60 @@ DeviceReset(_Inout_ MacRegisters* regs, _In_reads_(6) UINT8 const* mac0)
     return STATUS_TIMEOUT;
 }
 
-_IRQL_requires_max_(DISPATCH_LEVEL)
+_IRQL_requires_max_(PASSIVE_LEVEL)
 static void
 UpdateLinkState(_In_ DeviceContext const* context)
 {
-    // DISPATCH_LEVEL
+    // PASSIVE_LEVEL, nonpaged (resume path)
     auto const controlStatus = Read32(&context->regs->Mac_PhyIf_Control_Status); // Clears LinkStatus interrupt.
     auto const oldConfig = Read32(&context->regs->Mac_Configuration);
     auto newConfig = oldConfig;
     newConfig.FullDuplex = controlStatus.FullDuplex;
+
+    // TODO: call ACPI to change phy clock speed.
+    // Write-enable for bits 3:2, plus constants for bits 3:2.
+    // Shift left by 0 for GMAC0.
+    // Shift left by 5 for GMAC1.
+    UINT32 clockVal;
+    enum mii_tx_clk_sel_gamc : UINT32
+    {
+        mii_tx_clk_sel_gamc_rgmii_002_5 = 0xC0008, // 2.5Mhz = b'10
+        mii_tx_clk_sel_gamc_rgmii_025 = 0xC000C, // 25Mhz = b'11
+        mii_tx_clk_sel_gamc_rgmii_125 = 0xC0000, // 125Mhz = b'00
+    };
 
     UINT32 speed;
     switch (controlStatus.Speed)
     {
     case PhyIfSpeed_2_5M:
         speed = 10'000'000u;
+        clockVal = mii_tx_clk_sel_gamc_rgmii_002_5;
         newConfig.PortSelectSpeed = PortSelectSpeed_10M;
         break;
     case PhyIfSpeed_25M:
         speed = 100'000'000u;
+        clockVal = mii_tx_clk_sel_gamc_rgmii_025;
         newConfig.PortSelectSpeed = PortSelectSpeed_100M;
         break;
     case PhyIfSpeed_125M:
         speed = 1'000'000'000u;
+        clockVal = mii_tx_clk_sel_gamc_rgmii_125;
         newConfig.PortSelectSpeed = PortSelectSpeed_1000M;
         break;
     default:
         speed = 0;
+        clockVal = mii_tx_clk_sel_gamc_rgmii_125;
         break;
     }
 
-    // TODO: I think this is where we want to call ACPI to change phy clock speed.
+    if (context->php_grf_clk_con1_regs != nullptr)
+    {
+        clockVal <<= context->php_grf_clk_con1_gmac_shift;
+        Write32(context->php_grf_clk_con1_regs, clockVal);
+        TraceWrite("UpdateLinkState-clock", LEVEL_INFO,
+            TraceLoggingHexInt32(clockVal),
+            TraceLoggingPointer(context->php_grf_clk_con1_regs, "php_grf_clk_con1_regs"));
+    }
 
     if (oldConfig.Value32 != newConfig.Value32)
     {
@@ -360,7 +388,8 @@ DeviceInterruptDpc(
         if (newInterruptStatus.Value32 & InterruptLinkStatus)
         {
             context->dpcLinkState += 1;
-            UpdateLinkState(context); // Clears LinkStatus interrupt.
+            Read32(&context->regs->Mac_PhyIf_Control_Status); // Clears LinkStatus interrupt.
+            WdfWorkItemEnqueue(context->linkStateWorkItem);
         }
 
         if (newInterruptStatus.Rx || newInterruptStatus.Tx)
@@ -408,6 +437,17 @@ DeviceInterruptDpc(
         }
         WdfInterruptReleaseLock(context->interrupt); // HIGH_LEVEL --> DISPATCH_LEVEL
     }
+}
+
+static EVT_WDF_WORKITEM DeviceLinkStateWorkItem;
+static void
+DeviceLinkStateWorkItem(
+    _In_ WDFWORKITEM workItem)
+{
+    // PASSIVE_LEVEL, nonpaged (resume path)
+    auto const context = DeviceGetContext(WdfWorkItemGetParentObject(workItem));
+    NT_ASSERT(context->linkStateWorkItem == workItem);
+    UpdateLinkState(context);
 }
 
 static EVT_NET_ADAPTER_CREATE_TXQUEUE AdapterCreateTxQueue;
@@ -736,6 +776,20 @@ DevicePrepareHardware(
                     }
 
                     context->perfCounterDeviceId = static_cast<UINT32>(descRaw->u.Memory.Start.QuadPart >> 4);
+
+                    context->php_grf_clk_con1_gmac_shift = 0;
+                    switch (descRaw->u.Memory.Start.QuadPart)
+                    {
+                    case 0xFE1C0000:
+                        context->php_grf_clk_con1_gmac_shift = 5;
+                        __fallthrough;
+                    case 0xFE1B0000:
+                        context->php_grf_clk_con1_regs = static_cast<UINT32*>(MmMapIoSpaceEx(
+                            PHYSICAL_ADDRESS{ 0xFD5B0070, 0 },
+                            sizeof(UINT32),
+                            PAGE_READWRITE | PAGE_NOCACHE));
+                        break;
+                    }
                 }
                 break;
 
@@ -1140,7 +1194,6 @@ DevicePrepareHardware(
             goto Done;
         }
 
-        // TODO: tune? use ACPI _DSD?
         Write32(&regs->Axi_Lpi_Entry_Interval, 15); // AutoAxiLpi after (interval + 1) * 64 clocks. Max value is 15.
         auto busMode = Read32(&regs->Dma_SysBus_Mode);
         busMode.EnableLpi = true;       // true = allow LPI, honor AXI LPI request.
@@ -1202,6 +1255,13 @@ DeviceReleaseHardware(
     UNREFERENCED_PARAMETER(resourcesTranslated);
 
     auto const context = DeviceGetContext(device);
+
+    if (context->php_grf_clk_con1_regs != nullptr)
+    {
+        MmUnmapIoSpace(context->php_grf_clk_con1_regs, sizeof(UINT32));
+        context->php_grf_clk_con1_regs = nullptr;
+    }
+
     if (context->regs != nullptr)
     {
         DeviceReset(context->regs, context->permanentMacAddress);
@@ -1358,7 +1418,7 @@ DeviceAdd(
         WdfDeviceSetDeviceState(device, &deviceState);
     }
 
-    // Create lock.
+    // Create device objects.
 
     {
         auto const context = DeviceGetContext(device);
@@ -1371,6 +1431,16 @@ DeviceAdd(
         if (!NT_SUCCESS(status))
         {
             TraceWrite("WdfSpinLockCreate-failed", LEVEL_ERROR,
+                TraceLoggingNTStatus(status));
+            goto Done;
+        }
+
+        WDF_WORKITEM_CONFIG workItemConfig;
+        WDF_WORKITEM_CONFIG_INIT(&workItemConfig, DeviceLinkStateWorkItem);
+        status = WdfWorkItemCreate(&workItemConfig, &attributes, &context->linkStateWorkItem);
+        if (!NT_SUCCESS(status))
+        {
+            TraceWrite("WdfWorkItemCreate-failed", LEVEL_ERROR,
                 TraceLoggingNTStatus(status));
             goto Done;
         }
