@@ -3,11 +3,11 @@
 #include "trace.h"
 
 /*
-TODO list:
-- Use ACPI DSM to change TX_CLK instead of hard-coding clock address in driver.
+Possible areas for improvement:
+- Run against network test suites and fix any issues.
+- Interrupt moderation and/or other CPU usage improvements.
 - Jumbo frames.
-- Receive queue memory optimization?
-- Configuration in registry (e.g. flow control).
+- Configuration in registry (e.g. flow control, speed, duplex).
 - Tx segmentation offload.
 - Rx segmentation offload.
 - Wake-on-LAN.
