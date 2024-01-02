@@ -4,7 +4,7 @@
 
 /*
 TODO list:
-- Support for 10/100 Mbps modes (requires ACPI support).
+- Use ACPI DSM to change TX_CLK instead of hard-coding clock address in driver.
 - Jumbo frames.
 - Receive queue memory optimization?
 - Configuration in registry (e.g. flow control).

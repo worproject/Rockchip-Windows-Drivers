@@ -63,6 +63,10 @@ struct DeviceContext
     UINT8 currentMacAddress[ETHERNET_LENGTH_OF_ADDRESS];
     DeviceConfig config;
 
+    // TODO: call ACPI to change phy clock speed.
+    UINT8 php_grf_clk_con1_gmac_shift; // 0 for GMAC0, 5 for GMAC1.
+    UINT32* php_grf_clk_con1_regs;
+
     // Mutable.
 
     ChannelStatus_t interruptStatus; // Channel0 + InterruptLinkStatus. Interlocked update.
@@ -156,27 +160,50 @@ UpdateLinkState(_In_ DeviceContext const* context)
     auto newConfig = oldConfig;
     newConfig.FullDuplex = controlStatus.FullDuplex;
 
+    // TODO: call ACPI to change phy clock speed.
+    // Write-enable for bits 3:2, plus constants for bits 3:2.
+    // Shift left by 0 for GMAC0.
+    // Shift left by 5 for GMAC1.
+    UINT32 clockVal;
+    enum mii_tx_clk_sel_gamc : UINT32
+    {
+        mii_tx_clk_sel_gamc_rgmii_002_5 = 0xC0008, // 2.5Mhz = b'10
+        mii_tx_clk_sel_gamc_rgmii_025 = 0xC000C, // 25Mhz = b'11
+        mii_tx_clk_sel_gamc_rgmii_125 = 0xC0000, // 125Mhz = b'00
+    };
+
     UINT32 speed;
     switch (controlStatus.Speed)
     {
     case PhyIfSpeed_2_5M:
         speed = 10'000'000u;
+        clockVal = mii_tx_clk_sel_gamc_rgmii_002_5;
         newConfig.PortSelectSpeed = PortSelectSpeed_10M;
         break;
     case PhyIfSpeed_25M:
         speed = 100'000'000u;
+        clockVal = mii_tx_clk_sel_gamc_rgmii_025;
         newConfig.PortSelectSpeed = PortSelectSpeed_100M;
         break;
     case PhyIfSpeed_125M:
         speed = 1'000'000'000u;
+        clockVal = mii_tx_clk_sel_gamc_rgmii_125;
         newConfig.PortSelectSpeed = PortSelectSpeed_1000M;
         break;
     default:
         speed = 0;
+        clockVal = mii_tx_clk_sel_gamc_rgmii_125;
         break;
     }
 
-    // TODO: I think this is where we want to call ACPI to change phy clock speed.
+    if (context->php_grf_clk_con1_regs != nullptr)
+    {
+        clockVal <<= context->php_grf_clk_con1_gmac_shift;
+        Write32(context->php_grf_clk_con1_regs, clockVal);
+        TraceWrite("UpdateLinkState-clock", LEVEL_INFO,
+            TraceLoggingHexInt32(clockVal),
+            TraceLoggingPointer(context->php_grf_clk_con1_regs, "php_grf_clk_con1_regs"));
+    }
 
     if (oldConfig.Value32 != newConfig.Value32)
     {
@@ -736,6 +763,20 @@ DevicePrepareHardware(
                     }
 
                     context->perfCounterDeviceId = static_cast<UINT32>(descRaw->u.Memory.Start.QuadPart >> 4);
+
+                    context->php_grf_clk_con1_gmac_shift = 0;
+                    switch (descRaw->u.Memory.Start.QuadPart)
+                    {
+                    case 0xFE1C0000:
+                        context->php_grf_clk_con1_gmac_shift = 5;
+                        __fallthrough;
+                    case 0xFE1B0000:
+                        context->php_grf_clk_con1_regs = static_cast<UINT32*>(MmMapIoSpaceEx(
+                            PHYSICAL_ADDRESS{ 0xFD5B0070, 0 },
+                            sizeof(UINT32),
+                            PAGE_READWRITE | PAGE_NOCACHE));
+                        break;
+                    }
                 }
                 break;
 
@@ -1140,7 +1181,6 @@ DevicePrepareHardware(
             goto Done;
         }
 
-        // TODO: tune? use ACPI _DSD?
         Write32(&regs->Axi_Lpi_Entry_Interval, 15); // AutoAxiLpi after (interval + 1) * 64 clocks. Max value is 15.
         auto busMode = Read32(&regs->Dma_SysBus_Mode);
         busMode.EnableLpi = true;       // true = allow LPI, honor AXI LPI request.
@@ -1202,6 +1242,13 @@ DeviceReleaseHardware(
     UNREFERENCED_PARAMETER(resourcesTranslated);
 
     auto const context = DeviceGetContext(device);
+
+    if (context->php_grf_clk_con1_regs != nullptr)
+    {
+        MmUnmapIoSpace(context->php_grf_clk_con1_regs, sizeof(UINT32));
+        context->php_grf_clk_con1_regs = nullptr;
+    }
+
     if (context->regs != nullptr)
     {
         DeviceReset(context->regs, context->permanentMacAddress);
