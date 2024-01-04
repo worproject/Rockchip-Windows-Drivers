@@ -5,11 +5,9 @@
 /*
 Possible areas for improvement:
 - Run against network test suites and fix any issues.
-- Interrupt moderation and/or other CPU usage improvements.
 - Jumbo frames.
 - Configuration in registry (e.g. flow control, speed, duplex).
 - Tx segmentation offload.
-- Rx segmentation offload.
 - Wake-on-LAN.
 - ARP offload.
 - Multi-queue support?
@@ -18,7 +16,7 @@ Possible areas for improvement:
 TRACELOGGING_DEFINE_PROVIDER(
     TraceProvider,
     "dwc_eqos",
-    // *dwc_eqos = {5d8331d3-70b3-5620-5664-db28f48a4b79}
+    // {5d8331d3-70b3-5620-5664-db28f48a4b79} = Hash("dwc_eqos")
     (0x5d8331d3, 0x70b3, 0x5620, 0x56, 0x64, 0xdb, 0x28, 0xf4, 0x8a, 0x4b, 0x79));
 
 static EVT_WDF_DRIVER_UNLOAD DriverUnload;

@@ -3,7 +3,7 @@ Device behavior. Includes adapter and interrupt since they are 1:1 with the devi
 */
 #pragma once
 
-struct DeviceContext; // Multi-queue: change to DeviceQueueContext.
+struct DeviceContext; // TODO: if we do multi-queue, make a DeviceQueueContext struct instead.
 
 // Information about the device provided to the queues.
 struct DeviceConfig
@@ -11,7 +11,7 @@ struct DeviceConfig
     bool txCoeSel;      // MAC_HW_Feature0\TXCOESEL (hardware support for tx checksum offload).
     bool rxCoeSel;      // MAC_HW_Feature0\RXCOESEL (hardware support for rx checksum offload).
     bool pblX8;         // _DSD\snps,pblx8 (default = 1).
-    UINT8 pbl;          // _DSD\snps,pbl (default = 8).
+    UINT8 pbl;          // _DSD\snps,pbl (default = 8; effect depends on pblX8).
     UINT8 txPbl;        // _DSD\snps,txpbl (default = pbl; effect depends on pblX8).
     UINT8 rxPbl;        // _DSD\snps,rxpbl (default = pbl; effect depends on pblX8).
     bool fixed_burst;   // _DSD\snps,fixed-burst (default = 0).

@@ -24,6 +24,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\acpiutil.hpp" />
+    <ClInclude Include="descriptors.h" />
     <ClInclude Include="device.h" />
     <ClInclude Include="dwc_eqos_perf_data.h" />
     <ClInclude Include="queue_common.h" />

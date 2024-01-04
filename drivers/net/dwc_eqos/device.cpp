@@ -29,7 +29,7 @@ static auto constexpr DefaultCsrRate = 125'000'000u;
 static auto constexpr BusBytes = 8u;
 static auto constexpr QueuesSupported = 1u; // TODO: Support multiple queues?
 static auto constexpr InterruptLinkStatus = 0x80000000u;
-static auto constexpr InterruptChannel0Status = ~InterruptLinkStatus;
+static auto constexpr InterruptChannel0StatusMask = ~InterruptLinkStatus;
 
 // D637828D-556C-4829-966A-237072F00FF1
 static GUID constexpr DsmGuid = { 0xD637828D, 0x556C, 0x4829, 0x96, 0x6A, 0x23, 0x70, 0x72, 0xF0, 0x0F, 0xF1 };
@@ -105,24 +105,22 @@ static void
 SetOneMacAddress(_Inout_ MacRegisters* regs, unsigned index, _In_reads_(6) UINT8 const* addr, bool enable)
 {
     // PASSIVE_LEVEL, nonpaged (resume path)
-    MacAddressLow_t regLo = {};
-    regLo.Addr0 = addr[0];
-    regLo.Addr1 = addr[1];
-    regLo.Addr2 = addr[2];
-    regLo.Addr3 = addr[3];
+    MacAddressRegisters addrRegs = {};
+    addrRegs.Low.Addr0 = addr[0];
+    addrRegs.Low.Addr1 = addr[1];
+    addrRegs.Low.Addr2 = addr[2];
+    addrRegs.Low.Addr3 = addr[3];
+    addrRegs.High.Addr4 = addr[4];
+    addrRegs.High.Addr5 = addr[5];
+    addrRegs.High.AddressEnable = enable;
 
-    MacAddressHigh_t regHi = {};
-    regHi.Addr4 = addr[4];
-    regHi.Addr5 = addr[5];
-    regHi.AddressEnable = enable;
-
-    Write32(&regs->Mac_Address[index].High, regHi);
-    Write32(&regs->Mac_Address[index].Low, regLo);
+    Write32(&regs->Mac_Address[index].High, addrRegs.High);
+    Write32(&regs->Mac_Address[index].Low, addrRegs.Low);
 
     TraceEntryExit(SetOneMacAddress, LEVEL_VERBOSE,
         TraceLoggingUInt32(index),
-        TraceLoggingHexInt32(regHi.Value32, "MacHi"),
-        TraceLoggingHexInt32(regLo.Value32, "MacLo"));
+        TraceLoggingHexInt32(addrRegs.High.Value32, "MacHi"),
+        TraceLoggingHexInt32(addrRegs.Low.Value32, "MacLo"));
 }
 
 // Perform a software reset, then set mac address 0 to the specified value.
@@ -337,7 +335,7 @@ DeviceInterruptIsr(
     }
 
     auto const channel0 = Read32(&regs->Dma_Ch[0].Status);
-    newInterruptStatus.Value32 |= channel0.Value32 & InterruptChannel0Status;
+    newInterruptStatus.Value32 |= channel0.Value32 & InterruptChannel0StatusMask;
 
     if (newInterruptStatus.Value32 != 0)
     {
@@ -523,7 +521,7 @@ AdapterSetReceiveFilter(
         SetOneMacAddress(context->regs, 0, context->currentMacAddress,
             0 != (flags & NetPacketFilterFlagDirected)); // Address[0] can't really be disabled...
 
-        // Could also use hash-based filtering for additional mcast support, but this seems okay.
+        // Could use hash-based filtering for additional mcast support, but this seems okay.
         auto const macAddrCount = context->feature0.MacAddrCount;
         for (unsigned i = 1; i < macAddrCount; i += 1)
         {
@@ -1212,12 +1210,10 @@ DevicePrepareHardware(
 
         Write32(&regs->Mac_1us_Tic_Counter, DefaultCsrRate / 1'000'000u - 1);
 
-        static_assert(sizeof(RxDescriptor) == sizeof(TxDescriptor),
-            "RxDescriptor must be same size as TxDescriptor.");
-        static_assert(sizeof(RxDescriptor) % BusBytes == 0,
-            "RxDescriptor must be a multiple of bus width.");
+        static_assert(QueueDescriptorSize % BusBytes == 0,
+            "QueueDescriptorSize must be a multiple of bus width.");
         ChannelDmaControl_t dmaControl = {};
-        dmaControl.DescriptorSkipLength = (sizeof(RxDescriptor) - 16) / BusBytes;
+        dmaControl.DescriptorSkipLength = (QueueDescriptorSize - 16) / BusBytes;
         dmaControl.PblX8 = context->config.pblX8;
         Write32(&regs->Dma_Ch[0].Control, dmaControl);
 

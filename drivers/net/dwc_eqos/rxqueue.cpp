@@ -3,6 +3,7 @@
 #include "queue_common.h"
 #include "device.h"
 #include "registers.h"
+#include "descriptors.h"
 #include "trace.h"
 
 static_assert(sizeof(RxDescriptor) == QueueDescriptorSize);
@@ -122,9 +123,9 @@ RxQueueAdvance(_In_ NETPACKETQUEUE queue)
         if (descWrite.Own)
         {
             /*
-            This sometimes happens with transmit descriptors.
+            This sometimes happens with transmit descriptors (DMA race).
             I've never seen it happen with receive descriptors, but if it does, breaking out here
-            should take care of it.
+            is the right way to deal with it.
             */
             TraceWrite("RxQueueAdvance-own", LEVEL_WARNING,
                 TraceLoggingUInt32(descIndex, "descIndex"),

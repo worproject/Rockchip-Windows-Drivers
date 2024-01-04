@@ -47,6 +47,9 @@
     <ClInclude Include="..\..\include\acpiutil.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="descriptors.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="device.cpp">

@@ -3,6 +3,7 @@
 #include "queue_common.h"
 #include "device.h"
 #include "registers.h"
+#include "descriptors.h"
 #include "trace.h"
 
 static_assert(sizeof(TxDescriptor) == QueueDescriptorSize);
@@ -138,13 +139,14 @@ TxQueueAdvance(_In_ NETPACKETQUEUE queue)
                 {
                     /*
                     There's a race condition where we see the update to Current_App_TxDesc
-                    before we see the update to the descriptor. It seems harmless (we
-                    only use the descriptor for assertions and logging), and a fix for
-                    this would likely affect performance, so just stop when we see a
-                    descriptor with the Own bit still set.
+                    before we see the update to the descriptor. We don't want to write to
+                    the descriptor's memory while the update is in flight, but this is
+                    otherwise harmless (we only use the descriptor for assertions and
+                    logging), and a fix for this would likely affect performance, so just
+                    stop when we see a descriptor with the Own bit still set. We'll
+                    process it the next time we're called.
 
-                    This would be a bigger issue if it happened in the Rx path, but
-                    I've never seen that happen.
+                    This doesn't seem to happen in the Rx path.
                     */
                     TraceWrite("TxQueueAdvance-own", LEVEL_VERBOSE,
                         TraceLoggingUInt32(descIndex2, "descIndex"),
@@ -187,7 +189,7 @@ DoneIndicating:
 
     pktIndex = pktNext;
 
-    // Number of EMPTY is (descBegin-1) - descEnd, wrapping around if necessary.
+    // Number of EMPTY is (descBegin-1) - descEnd (wrapping around if necessary).
     auto const txChecksumOffload = context->txChecksumOffload;
     auto const descEnd = context->descEnd;
     auto descEmpty = ((context->descBegin - 1) - descEnd) & descMask;
