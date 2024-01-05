@@ -90,7 +90,6 @@ struct DeviceContext
     UINT32 dpcFatalBusError; // Updated only in DPC.
     UINT32 rxOwnDescriptors; // Updated only during RxQueueAdvance.
     UINT32 rxDoneFragments; // Updated only during RxQueueAdvance.
-    UINT32 txOwnDescriptors; // Updated only during TxQueueAdvance.
     UINT32 txDoneFragments; // Updated only during TxQueueAdvance.
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(DeviceContext, DeviceGetContext)
@@ -593,7 +592,7 @@ DeviceD0Entry(
         : txFifoSize / QueuesSupported;
 
     MacTxFlowCtrl_t txFlowCtrl = {};
-    txFlowCtrl.TransmitFlowControlEnable = true;
+    txFlowCtrl.TransmitFlowControlEnable = context->config.txFlowControl;
     txFlowCtrl.PauseTime = 0xFFFF;
     Write32(&context->regs->Mac_Tx_Flow_Ctrl, txFlowCtrl); // TxFlow control, pause time.
 
@@ -617,7 +616,7 @@ DeviceD0Entry(
     UINT32 const rxFlowControlDeactivate =
         rxFlowControlActivate + rxFlowControlActivate / 2u; // Unpause when 3/4 or 48KB remains.
 
-    Write32(&context->regs->Mac_Rx_Flow_Ctrl, 0x3); // Rx flow control, pause packet detect.
+    Write32(&context->regs->Mac_Rx_Flow_Ctrl, context->config.rxFlowControl ? 0x3 : 0x0); // Rx flow control, pause packet detect.
     Write32(&context->regs->Mac_RxQ_Ctrl0, 0x2); // RxQ0 enabled for DCB/generic.
 
     MtlRxOperationMode_t rxOperationMode = {};
@@ -626,7 +625,7 @@ DeviceD0Entry(
     rxOperationMode.ForwardErrorPackets = false;
     rxOperationMode.ForwardUndersizedGoodPackets = true;
     rxOperationMode.QueueSize = rxQueueSize / 256u - 1;
-    rxOperationMode.HardwareFlowControl = rxQueueSize >= 2048;
+    rxOperationMode.HardwareFlowControl = context->config.rxFlowControl && rxQueueSize >= 2048;
     rxOperationMode.FlowControlActivate = (rxFlowControlActivate / 512u) - 2u;
     rxOperationMode.FlowControlDeactivate = (rxFlowControlDeactivate / 512u) - 2u;
     Write32(&context->regs->Mtl_Q[0].Rx_Operation_Mode, rxOperationMode);
@@ -634,12 +633,20 @@ DeviceD0Entry(
     // MAC configuration.
 
     MacConfiguration_t macConfig = {};
-    macConfig.DisableCarrierSenseDuringTransmit = true;
-    macConfig.PacketBurstEnable = true;
     macConfig.ReceiverEnable = true;
     macConfig.TransmitterEnable = true;
+    macConfig.DisableCarrierSenseDuringTransmit = true;
+    macConfig.DisableReceiveOwn = true;
+    macConfig.PacketBurstEnable = true;
+    //macConfig.PadOrCrcStripEnable = true;   // Why doesn't this work?
+    //macConfig.CrcStripEnableForType = true; // Why doesn't this work?
     macConfig.ChecksumOffloadEnable = context->config.txCoeSel || context->config.rxCoeSel;
     Write32(&context->regs->Mac_Configuration, macConfig);
+
+    Mac_Vlan_Tag_Ctrl_t vlanTagCtrl = {};
+    vlanTagCtrl.StripOnReceive = VlanTagStripOnReceive_Always;
+    vlanTagCtrl.RxStatusEnable = true;
+    Write32(&context->regs->Mac_Vlan_Tag_Ctrl, vlanTagCtrl);
 
     // Clear any pending interrupts, then unmask them.
 
@@ -707,6 +714,7 @@ DevicePrepareHardware(
     PHYSICAL_ADDRESS maxPhysicalAddress;
     auto const context = DeviceGetContext(device);
     bool configHasMacAddress = false;
+    ULONG flowControlConfiguration;
 
     // Read configuration
 
@@ -745,6 +753,15 @@ DevicePrepareHardware(
                 TraceLoggingBinary(configAddress.Address, ETHERNET_LENGTH_OF_ADDRESS, "address"));
             memcpy(context->currentMacAddress, configAddress.Address, sizeof(context->currentMacAddress));
             configHasMacAddress = true;
+        }
+
+        DECLARE_CONST_UNICODE_STRING(FlowControl_Name, L"FlowControl");
+        status = NetConfigurationQueryUlong(configuration, NET_CONFIGURATION_QUERY_ULONG_NO_FLAGS, &FlowControl_Name, &flowControlConfiguration);
+        if (!NT_SUCCESS(status))
+        {
+            TraceWrite("QueryFlowControl-not-found", LEVEL_VERBOSE,
+                TraceLoggingNTStatus(status));
+            flowControlConfiguration = 3; // Default = TxRxEnabled
         }
     }
 
@@ -908,6 +925,14 @@ DevicePrepareHardware(
             status = STATUS_DEVICE_CONFIGURATION_ERROR;
             goto Done;
         }
+
+        if (!context->feature0.SaVlanIns)
+        {
+            // Could adapt at runtime if needed, but assume it's present for now.
+            TraceWrite("DevicePrepareHardware-SaVlanIns-required", LEVEL_ERROR);
+            status = STATUS_DEVICE_CONFIGURATION_ERROR;
+            goto Done;
+        }
     }
 
     // Device Config
@@ -924,6 +949,33 @@ DevicePrepareHardware(
         context->config.wr_osr_lmt = 4;
         context->config.rd_osr_lmt = 8;
         context->config.blen = 0x7; // 0x7 = 4, 8, 16
+
+        switch (flowControlConfiguration)
+        {
+        case 0: // Disabled
+            context->config.txFlowControl = false;
+            context->config.rxFlowControl = false;
+            break;
+        case 1: // TxEnabled
+            context->config.txFlowControl = true;
+            context->config.rxFlowControl = false;
+            break;
+        case 2: // RxEnabled
+            context->config.txFlowControl = false;
+            context->config.rxFlowControl = true;
+            break;
+        case 3: // TxRxEnabled
+        case 4: // AutoNegotiate
+            context->config.txFlowControl = true;
+            context->config.rxFlowControl = true;
+            break;
+        default:
+            TraceWrite("QueryFlowControl-bad-value", LEVEL_WARNING,
+                TraceLoggingUInt32(flowControlConfiguration, "value"));
+            context->config.txFlowControl = true;
+            context->config.rxFlowControl = true;
+            break;
+        }
 
         auto const deviceObject = WdfDeviceWdmGetPhysicalDevice(device);
         PACPI_EVAL_OUTPUT_BUFFER outputBuffer = nullptr;
@@ -1139,7 +1191,7 @@ DevicePrepareHardware(
 
         NET_ADAPTER_TX_CAPABILITIES txCaps;
         NET_ADAPTER_TX_CAPABILITIES_INIT_FOR_DMA(&txCaps, &dmaCaps, QueuesSupported);
-        txCaps.MaximumNumberOfFragments = QueueDescriptorMinCount - 1;
+        txCaps.MaximumNumberOfFragments = QueueDescriptorMinCount - 2; // = 1 hole in the ring + 1 context descriptor.
 
         NET_ADAPTER_RX_CAPABILITIES rxCaps; // TODO: Might use less memory if driver-managed.
         NET_ADAPTER_RX_CAPABILITIES_INIT_SYSTEM_MANAGED_DMA(&rxCaps, &dmaCaps, RxBufferSize, QueuesSupported); // TODO: Jumbo packets.
@@ -1181,6 +1233,12 @@ DevicePrepareHardware(
         NET_ADAPTER_OFFLOAD_RX_CHECKSUM_CAPABILITIES_INIT(&rxChecksumCaps,
             AdapterOffloadSetRxChecksum);
         NetAdapterOffloadSetRxChecksumCapabilities(context->adapter, &rxChecksumCaps);
+
+        NET_ADAPTER_OFFLOAD_IEEE8021Q_TAG_CAPABILITIES ieee8021qCaps;
+        NET_ADAPTER_OFFLOAD_IEEE8021Q_TAG_CAPABILITIES_INIT(&ieee8021qCaps,
+            NetAdapterOffloadIeee8021PriorityTaggingFlag |
+            NetAdapterOffloadIeee8021VlanTaggingFlag);
+        NetAdapterOffloadSetIeee8021qTagCapabilities(context->adapter, &ieee8021qCaps);
     }
 
     // Initialize adapter.
@@ -1325,11 +1383,9 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 void
 DeviceAddStatisticsTxQueue(
     _Inout_ DeviceContext* context,
-    UINT32 ownDescriptors,
     UINT32 doneFragments)
 {
     // DISPATCH_LEVEL
-    context->txOwnDescriptors += ownDescriptors;
     context->txDoneFragments += doneFragments;
 }
 
@@ -1544,7 +1600,6 @@ PerfDataInit(
     data->DpcFatalBusError = context->dpcFatalBusError;
     data->RxOwnDescriptors = context->rxOwnDescriptors;
     data->RxDoneFragments = context->rxDoneFragments;
-    data->TxOwnDescriptors = context->txOwnDescriptors;
     data->TxDoneFragments = context->txDoneFragments;
 }
 

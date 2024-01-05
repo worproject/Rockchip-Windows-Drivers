@@ -639,6 +639,43 @@ union MacPacketFilter_t
     };
 };
 
+enum VlanTagStripOnReceive : UINT8
+{
+    VlanTagStripOnReceive_Never,
+    VlanTagStripOnReceive_IfFilterPasses,
+    VlanTagStripOnReceive_IfFilterFails,
+    VlanTagStripOnReceive_Always,
+};
+
+union Mac_Vlan_Tag_Ctrl_t
+{
+    UINT32 Value32;
+    struct
+    {
+        UINT8 OperationBusy : 1; // OB
+        UINT8 CommandType : 1; // CT, 0 = write, 1 = read.
+        UINT8 Offset : 5; // OFS
+        UINT8 Reserved7 : 1;
+
+        UINT8 Reserved8;
+
+        UINT8 Reserved16 : 1;
+        UINT8 InverseMatchEnable : 1; // VTIM
+        UINT8 SvlanEnable : 1; // ESVL
+        UINT8 Reserved19 : 2;
+        VlanTagStripOnReceive StripOnReceive : 2; // EVLS
+        UINT8 Reserved23 : 1;
+
+        UINT8 RxStatusEnable : 1; // EVLRXS
+        UINT8 HashTableMatchEnable : 1; // VTHM
+        UINT8 DoubleVlanEnable : 1; // EDVLP
+        UINT8 InnerEnable : 1; // ERIVLT
+        VlanTagStripOnReceive InnerStripOnReceive : 2; // EIVLS
+        UINT8 Reserved30 : 1;
+        UINT8 InnerRxStatusEnable : 1; // EIVLRXS
+    };
+};
+
 union MacInterruptStatus_t
 {
     UINT32 Value32;
@@ -924,7 +961,7 @@ struct MacRegisters
     // This register is the redefined format of the MAC VLAN Tag Register. It is used
     // for indirect addressing. It contains the address offset, command type and Busy
     // Bit for CSR access of the Per VLAN Tag registers.
-    ULONG Mac_Vlan_Tag_Ctrl;
+    Mac_Vlan_Tag_Ctrl_t Mac_Vlan_Tag_Ctrl;
 
     // MAC_VLAN_Tag_Data @ 0x0054 = 0x0:
     // This register holds the read/write data for Indirect Access of the Per VLAN Tag
