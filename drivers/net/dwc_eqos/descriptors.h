@@ -168,6 +168,7 @@ struct TxDescriptorContext
     UINT8 OneStepEnable : 1; // OSTC
     UINT8 Reserved28 : 2;
     UINT8 ContextType : 1; // CTXT = 1
+    UINT8 Own : 1; // OWN
 
 #if DBG
     UINT32 FragmentIndex;

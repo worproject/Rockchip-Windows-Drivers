@@ -1,15 +1,14 @@
 #include "precomp.h"
-#include "device.h" // DeviceAdd
+#include "device.h"
 #include "trace.h"
 
 /*
 Possible areas for improvement:
-- Run against network test suites and fix any issues.
 - Jumbo frames.
-- Configuration in registry (e.g. flow control, speed, duplex).
 - Tx segmentation offload.
-- Wake-on-LAN.
-- ARP offload.
+- Run against network test suites and fix any issues.
+- Power control, wake-on-LAN, ARP offload.
+- Configure speed, duplex in Ndi\params.
 - Multi-queue support?
 */
 

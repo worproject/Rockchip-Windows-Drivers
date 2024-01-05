@@ -30,7 +30,6 @@ struct PERF_DEBUG_DATA
     UINT32 DpcFatalBusError;
     UINT32 RxOwnDescriptors;
     UINT32 RxDoneFragments;
-    UINT32 TxOwnDescriptors;
     UINT32 TxDoneFragments;
 };
 

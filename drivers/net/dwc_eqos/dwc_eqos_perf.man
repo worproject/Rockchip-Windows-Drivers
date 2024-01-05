@@ -454,19 +454,10 @@
             />
           <counter
             detailLevel="standard"
-            field="TxOwnDescriptors"
-            id="9"
-            name="TxOwnDescriptors"
-            nameID="278"
-            type="perf_counter_rawcount"
-            uri="uri:opensource/dwc_eqos/perf/debug/TxOwnDescriptors"
-            />
-          <counter
-            detailLevel="standard"
             field="TxDoneFragments"
-            id="10"
+            id="9"
             name="TxDoneFragments"
-            nameID="280"
+            nameID="278"
             type="perf_counter_rawcount"
             uri="uri:opensource/dwc_eqos/perf/debug/TxDoneFragments"
             />

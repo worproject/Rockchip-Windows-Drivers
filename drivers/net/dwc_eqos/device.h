@@ -19,6 +19,8 @@ struct DeviceConfig
     UINT8 wr_osr_lmt;   // AXIC\snps,wr_osr_lmt (default = 4).
     UINT8 rd_osr_lmt;   // AXIC\snps,rd_osr_lmt (default = 8).
     UINT8 blen : 7;     // AXIC\snps,blen bitmask of 7 booleans 4..256 (default = 4, 8, 16).
+    bool txFlowControl; // Adapter configuration (Ndi\params\*FlowControl).
+    bool rxFlowControl; // Adapter configuration (Ndi\params\*FlowControl).
 };
 
 // Referenced in driver.cpp DriverEntry.
@@ -66,5 +68,4 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 void
 DeviceAddStatisticsTxQueue(
     _Inout_ DeviceContext* context,
-    UINT32 ownDescriptors,
     UINT32 doneFragments);

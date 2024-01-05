@@ -18,16 +18,20 @@ struct TxQueueContext
     WDFCOMMONBUFFER descBuffer;
     TxDescriptor* descVirtual;
     PHYSICAL_ADDRESS descPhysical;
+    NET_EXTENSION packetIeee8021Q;
     NET_EXTENSION packetChecksum;
     NET_EXTENSION fragmentLogical;
     UINT32 descCount;   // A power of 2 between QueueDescriptorMinCount and QueueDescriptorMaxCount.
     UINT8 txPbl;
     bool txChecksumOffload;
 
+    UINT16 lastVlanTag;
     UINT32 descBegin;   // Start of the TRANSMIT region.
     UINT32 descEnd;     // End of the TRANSMIT region, start of the EMPTY region.
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(TxQueueContext, TxQueueGetContext)
+
+#if DBG
 
 // Gets channelRegs->Current_App_TxDesc, converted to an index.
 static UINT32
@@ -37,6 +41,8 @@ GetDescNext(_In_ TxQueueContext* context)
     auto const current = Read32(&context->channelRegs->Current_App_TxDesc);
     return QueueDescriptorAddressToIndex(current, context->descPhysical, context->descCount);
 }
+
+#endif // DBG
 
 // Sets channelRegs->TxDesc_Tail_Pointer to the physical address of the descriptor at the given index.
 static void
@@ -58,6 +64,7 @@ TxQueueStart(_In_ NETPACKETQUEUE queue)
     // PASSIVE_LEVEL, nonpaged (resume path)
     auto const context = TxQueueGetContext(queue);
 
+    context->lastVlanTag = 0; // Make no assumptions about the device's current vlan tag.
     context->descBegin = 0;
     context->descEnd = 0;
 
@@ -80,123 +87,121 @@ TxQueueStart(_In_ NETPACKETQUEUE queue)
     TraceEntryExit(TxQueueStart, LEVEL_INFO);
 }
 
+// Starting at pktIndex, scan forward until we reach packetRing->NextIndex or a
+// non-ignored packet. If we reach a non-ignored packet, sets *pktLastFrag to the last
+// fragment of the found packet and returns the packet's index. Otherwise, sets
+// *pktLastFrag to 0xFFFFFFFF and returns packetRing->NextIndex.
+static UINT32
+SkipIgnorePackets(UINT32 pktIndex, _In_ TxQueueContext const* context, _Out_ UINT32* pktLastFrag)
+{
+    // DISPATCH_LEVEL
+    auto const pktNext = context->packetRing->NextIndex;
+    for (; pktIndex != pktNext; pktIndex = NetRingIncrementIndex(context->packetRing, pktIndex))
+    {
+        auto const pkt = NetRingGetPacketAtIndex(context->packetRing, pktIndex);
+        if (!pkt->Ignore)
+        {
+            NT_ASSERT(pkt->FragmentCount != 0);
+            *pktLastFrag = NetRingAdvanceIndex(context->fragmentRing, pkt->FragmentIndex, pkt->FragmentCount - 1u);
+            return pktIndex;
+        }
+    }
+
+    *pktLastFrag = 0xFFFFFFFF;
+    return pktNext;
+}
+
 static EVT_PACKET_QUEUE_ADVANCE TxQueueAdvance;
 static void
 TxQueueAdvance(_In_ NETPACKETQUEUE queue)
 {
     // DISPATCH_LEVEL
     auto const context = TxQueueGetContext(queue);
-    auto const pktBegin = context->packetRing->BeginIndex;
-    auto const pktNext = context->packetRing->NextIndex;
-    auto const pktEnd = context->packetRing->EndIndex;
     auto const descMask = context->descCount - 1u;
-    UINT32 descIndex, pktIndex, fragIndex;
-    UINT32 ownDescriptors = 0, doneFrags = 0, queuedFrags = 0;
+    auto const descEnd = context->descEnd;
+    UINT32 descIndex, pktIndex, pktLastFrag, fragIndex;
+    UINT32 doneFrags = 0, queuedFrags = 0;
 
     /*
     Packet indexes:
     [pktBegin] old [pktNext] new [pktEnd] owned by NetAdapterCx [pktBegin]
 
     Descriptor indexes:
-    [descBegin] TRANSMITTED [descNext] TRANSMITTING [descEnd] EMPTY [descBegin-1]
+    [descBegin] TRANSMITTED TRANSMITTING [descEnd] EMPTY [descBegin-1]
     */
 
     // Indicate transmitted packets.
 
-    pktIndex = pktBegin;
+    // Process any descriptors that the adapter has handed back to us.
+    // Release the corresponding fragments and packets.
+    pktIndex = SkipIgnorePackets(context->packetRing->BeginIndex, context, &pktLastFrag);
     fragIndex = context->fragmentRing->BeginIndex;
-
-    auto const descNext = GetDescNext(context);
-    descIndex = context->descBegin;
-    auto descReady = (descNext - descIndex) & descMask; // Number of descriptors ready to be indicated.
-    while (descIndex != descNext)
+    for (descIndex = context->descBegin; descIndex != descEnd; descIndex = (descIndex + 1) & descMask)
     {
-        NT_ASSERT(pktIndex != pktNext);
+        NT_ASSERT(pktIndex != context->packetRing->NextIndex);
+        NT_ASSERT(pktLastFrag != 0xFFFFFFFF);
 
-        auto const pkt = NetRingGetPacketAtIndex(context->packetRing, pktIndex);
-        auto const fragmentCount = pkt->FragmentCount;
-        if (!pkt->Ignore)
+        auto const& desc = context->descVirtual[descIndex];
+        auto const descWrite = desc.Write;
+
+        if (descWrite.Own)
         {
-            NT_ASSERT(fragmentCount != 0);
-
-            if (fragmentCount > descReady)
-            {
-                break;
-            }
-
-            for (unsigned i = 0; i != fragmentCount; i += 1)
-            {
-                auto const descIndex2 = (descIndex + i) & descMask;
-                NT_ASSERT(descIndex2 != descNext);
-
-                auto const& desc = context->descVirtual[descIndex2];
-                auto const descWrite = desc.Write;
-                NT_ASSERT(descWrite.PacketIndex == pktIndex);
-                NT_ASSERT(descWrite.FragmentIndex == NetRingAdvanceIndex(context->fragmentRing, pkt->FragmentIndex, i));
-
-                // Descriptor is still owned by the DMA engine?
-                if (descWrite.Own)
-                {
-                    /*
-                    There's a race condition where we see the update to Current_App_TxDesc
-                    before we see the update to the descriptor. We don't want to write to
-                    the descriptor's memory while the update is in flight, but this is
-                    otherwise harmless (we only use the descriptor for assertions and
-                    logging), and a fix for this would likely affect performance, so just
-                    stop when we see a descriptor with the Own bit still set. We'll
-                    process it the next time we're called.
-
-                    This doesn't seem to happen in the Rx path.
-                    */
-                    TraceWrite("TxQueueAdvance-own", LEVEL_VERBOSE,
-                        TraceLoggingUInt32(descIndex2, "descIndex"),
-                        TraceLoggingHexInt32(reinterpret_cast<UINT32 const*>(&descWrite)[3], "TDES3"),
-                        TraceLoggingUInt32(i, "fragment"),
-                        TraceLoggingUInt32(fragmentCount));
-                    ownDescriptors = 1;
-                    goto DoneIndicating;
-                }
-                else if (
-                    descWrite.ErrorSummary ||
-                    descWrite.ContextType ||
-                    descWrite.DescriptorError ||
-                    (descWrite.LastDescriptor != 0) != (i == fragmentCount - 1u))
-                {
-                    TraceWrite("TxQueueAdvance-error", LEVEL_ERROR,
-                        TraceLoggingUInt32(descIndex2, "descIndex"),
-                        TraceLoggingHexInt32(reinterpret_cast<UINT32 const*>(&descWrite)[3], "TDES3"),
-                        TraceLoggingUInt32(i, "fragment"),
-                        TraceLoggingUInt32(fragmentCount));
-                }
-            }
-
-            doneFrags += fragmentCount;
-            descReady -= fragmentCount;
-            descIndex = (descIndex + fragmentCount) & descMask;
+            // Descriptor is still owned by the DMA engine.
+            break;
         }
 
-        pktIndex = NetRingIncrementIndex(context->packetRing, pktIndex);
-        fragIndex = NetRingAdvanceIndex(context->fragmentRing, pkt->FragmentIndex, fragmentCount);
+        NT_ASSERT(descWrite.PacketIndex == pktIndex);
+        NT_ASSERT(descWrite.FragmentIndex == fragIndex);
+
+        if (descWrite.ContextType)
+        {
+            // Ignore context descriptors.
+            continue;
+        }
+
+        if (descWrite.ErrorSummary ||
+            descWrite.ContextType ||
+            descWrite.DescriptorError ||
+            (descWrite.LastDescriptor != 0) != (fragIndex == pktLastFrag))
+        {
+            TraceWrite("TxQueueAdvance-error", LEVEL_ERROR,
+                TraceLoggingUInt32(descIndex),
+                TraceLoggingHexInt32(reinterpret_cast<UINT32 const*>(&descWrite)[3], "TDES3"),
+                TraceLoggingUInt32(fragIndex),
+                TraceLoggingUInt32(pktLastFrag));
+        }
+
+        // Non-context descriptors map one-to-one with fragments.
+
+        if (fragIndex == pktLastFrag)
+        {
+            // Packet is complete. Move to the next one.
+            pktIndex = SkipIgnorePackets(NetRingIncrementIndex(context->packetRing, pktIndex), context, &pktLastFrag);
+        }
+
+        // Fragment is complete. Move to the next one.
+        fragIndex = NetRingIncrementIndex(context->fragmentRing, fragIndex);
     }
 
-DoneIndicating:
-
+    // Return the completed packets and fragments to NetAdapterCx.
     context->packetRing->BeginIndex = pktIndex;
     context->fragmentRing->BeginIndex = fragIndex;
-    context->descBegin = descIndex;
+
+    auto const descBegin = descIndex;
+    context->descBegin = descBegin;
 
     // Fill more descriptors.
 
-    pktIndex = pktNext;
+    pktIndex = context->packetRing->NextIndex;
 
     // Number of EMPTY is (descBegin-1) - descEnd (wrapping around if necessary).
+    auto const pktEnd = context->packetRing->EndIndex;
     auto const txChecksumOffload = context->txChecksumOffload;
-    auto const descEnd = context->descEnd;
-    auto descEmpty = ((context->descBegin - 1) - descEnd) & descMask;
+    auto descEmpty = (descBegin - 1 - descEnd) & descMask;
     descIndex = descEnd;
     while (descEmpty != 0)
     {
-        NT_ASSERT(descIndex != ((context->descBegin - 1) & descMask));
+        NT_ASSERT(descIndex != ((descBegin - 1) & descMask));
 
         if (pktIndex == pktEnd)
         {
@@ -220,11 +225,46 @@ DoneIndicating:
                 : checksum.Layer3 ? TxChecksumInsertionEnabledHeaderOnly
                 : TxChecksumInsertionDisabled;
 
-            auto const fragmentCount = pkt->FragmentCount;
+            UINT32 const fragmentCount = pkt->FragmentCount;
             NT_ASSERT(fragmentCount != 0);
-            if (fragmentCount > descEmpty)
+
+            auto const ieee8021Q = NetExtensionGetPacketIeee8021Q(&context->packetIeee8021Q, pktIndex);
+            if (ieee8021Q->TxTagging != 0)
             {
-                break;
+                UINT16 const newTag = (ieee8021Q->PriorityCodePoint << 13) | ieee8021Q->VlanIdentifier;
+                NT_ASSERT(newTag != 0);
+                if (newTag == context->lastVlanTag)
+                {
+                    goto NoContextPacket;
+                }
+
+                if (fragmentCount + 1 > descEmpty)
+                {
+                    break;
+                }
+
+                TxDescriptorContext descCtx = {};
+                descCtx.VlanTag = newTag;
+                descCtx.VlanTagValid = true;
+                descCtx.ContextType = true;
+                descCtx.Own = true;
+#if DBG
+                descCtx.PacketIndex = pktIndex;
+                descCtx.FragmentIndex = fragIndex;
+#endif
+
+                context->descVirtual[descIndex].Context = descCtx;
+                descIndex = (descIndex + 1) & descMask;
+                descEmpty -= 1;
+            }
+            else
+            {
+            NoContextPacket:
+
+                if (fragmentCount > descEmpty)
+                {
+                    break;
+                }
             }
 
             UINT32 frameLength = 0;
@@ -263,24 +303,22 @@ DoneIndicating:
                 fragIndex = NetRingIncrementIndex(context->fragmentRing, fragIndex);
                 queuedFrags += 1;
             }
+
+            descEmpty -= fragmentCount;
         }
 
         pktIndex = NetRingIncrementIndex(context->packetRing, pktIndex);
     }
 
-    // In some error cases, the device may stall until we write to the tail pointer
-    // again. Write to the tail pointer if there are pending descriptors, even if we
-    // didn't fill any new ones.
-    if (descIndex != descNext)
+    if (descIndex != descEnd)
     {
         SetDescEnd(context, descIndex);
         context->packetRing->NextIndex = pktIndex;
     }
 
-    DeviceAddStatisticsTxQueue(context->deviceContext, ownDescriptors, doneFrags);
+    DeviceAddStatisticsTxQueue(context->deviceContext, doneFrags);
 
     TraceEntryExit(TxQueueAdvance, LEVEL_VERBOSE,
-        TraceLoggingUInt32(ownDescriptors),
         TraceLoggingUInt32(doneFrags),
         TraceLoggingUInt32(queuedFrags));
 }
@@ -490,6 +528,12 @@ TxQueueCreate(
             TraceLoggingPointer(context->descVirtual, "virtual"));
 
         NET_EXTENSION_QUERY query;
+
+        NET_EXTENSION_QUERY_INIT(&query,
+            NET_PACKET_EXTENSION_IEEE8021Q_NAME,
+            NET_PACKET_EXTENSION_IEEE8021Q_VERSION_1,
+            NetExtensionTypePacket);
+        NetTxQueueGetExtension(queue, &query, &context->packetIeee8021Q);
 
         if (context->txChecksumOffload)
         {
