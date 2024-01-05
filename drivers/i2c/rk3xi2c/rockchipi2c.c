@@ -409,6 +409,8 @@ NTSTATUS i2c_xfer_single(
 		return status;
 	}
 
+	status = pDevice->transactionStatus;
+
 	return status;
 }
 
