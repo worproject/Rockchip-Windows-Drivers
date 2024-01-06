@@ -191,31 +191,35 @@ NTSTATUS CCsAudioRk3xHW::rk3x_init() {
         I2S_RXCR_VDW(16));
 
     //set path
-    i2s_update32(I2S_TXCR,
-        I2S_TXCR_PATH_MASK(0),
-        I2S_TXCR_PATH(0, 3));
-    i2s_update32(I2S_TXCR,
-        I2S_TXCR_PATH_MASK(1),
-        I2S_TXCR_PATH(1, 2));
-    i2s_update32(I2S_TXCR,
-        I2S_TXCR_PATH_MASK(2),
-        I2S_TXCR_PATH(2, 1));
-    i2s_update32(I2S_TXCR,
-        I2S_TXCR_PATH_MASK(3),
-        I2S_TXCR_PATH(3, 0));
+    if (this->rkTPLG.i2s_tx_route) {
+        i2s_update32(I2S_TXCR,
+            I2S_TXCR_PATH_MASK(0),
+            I2S_TXCR_PATH(0, (this->rkTPLG.i2s_tx_route >> 12) & 0xf));
+        i2s_update32(I2S_TXCR,
+            I2S_TXCR_PATH_MASK(1),
+            I2S_TXCR_PATH(1, (this->rkTPLG.i2s_tx_route >> 8) & 0xf));
+        i2s_update32(I2S_TXCR,
+            I2S_TXCR_PATH_MASK(2),
+            I2S_TXCR_PATH(2, (this->rkTPLG.i2s_tx_route >> 4) & 0xf));
+        i2s_update32(I2S_TXCR,
+            I2S_TXCR_PATH_MASK(3),
+            I2S_TXCR_PATH(3, (this->rkTPLG.i2s_tx_route >> 0) & 0xf));
+    }
 
-    i2s_update32(I2S_RXCR,
-        I2S_RXCR_PATH_MASK(0),
-        I2S_RXCR_PATH(0, 1));
-    i2s_update32(I2S_RXCR,
-        I2S_RXCR_PATH_MASK(1),
-        I2S_RXCR_PATH(1, 3));
-    i2s_update32(I2S_RXCR,
-        I2S_RXCR_PATH_MASK(2),
-        I2S_RXCR_PATH(2, 2));
-    i2s_update32(I2S_RXCR,
-        I2S_RXCR_PATH_MASK(3),
-        I2S_RXCR_PATH(3, 0));
+    if (this->rkTPLG.i2s_rx_route) {
+        i2s_update32(I2S_RXCR,
+            I2S_RXCR_PATH_MASK(0),
+            I2S_RXCR_PATH(0, (this->rkTPLG.i2s_rx_route >> 12) & 0xf));
+        i2s_update32(I2S_RXCR,
+            I2S_RXCR_PATH_MASK(1),
+            I2S_RXCR_PATH(1, (this->rkTPLG.i2s_rx_route >> 8) & 0xf));
+        i2s_update32(I2S_RXCR,
+            I2S_RXCR_PATH_MASK(2),
+            I2S_RXCR_PATH(2, (this->rkTPLG.i2s_rx_route >> 4) & 0xf));
+        i2s_update32(I2S_RXCR,
+            I2S_RXCR_PATH_MASK(3),
+            I2S_RXCR_PATH(3, (this->rkTPLG.i2s_rx_route >> 0) & 0xf));
+    }
 
     return STATUS_SUCCESS;
 #else

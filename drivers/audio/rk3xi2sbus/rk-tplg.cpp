@@ -155,6 +155,12 @@ GetRKTplg(
 			else if (CHECK_STR(dsdParameterName, "rockchip,rx")) {
 				copyDSDParamNum(dsdParameterData, &rkTplg->rx);
 			}
+			else if (CHECK_STR(dsdParameterName, "rockchip,i2s-tx-route")) {
+				copyDSDParamNum(dsdParameterData, &rkTplg->i2s_tx_route);
+			}
+			else if (CHECK_STR(dsdParameterName, "rockchip,i2s-rx-route")) {
+				copyDSDParamNum(dsdParameterData, &rkTplg->i2s_rx_route);
+			}
 		}
 	}
 
