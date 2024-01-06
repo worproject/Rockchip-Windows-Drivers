@@ -14,6 +14,8 @@ typedef struct _RK_TPLG {
     UINT32 tx;
     UINT32 rx;
     char audio_tplg[32];
+    UINT32 i2s_tx_route;
+    UINT32 i2s_rx_route;
 } RK_TPLG, *PRK_TPLG;
 
 typedef struct _TPLG_INFO {
