@@ -120,7 +120,6 @@ RxQueueAdvance(_In_ NETPACKETQUEUE queue)
         auto const descWrite = desc.Write;
 
         // Descriptor is still owned by the DMA engine?
-        NT_ASSERT(!descWrite.Own);
         if (descWrite.Own)
         {
             /*

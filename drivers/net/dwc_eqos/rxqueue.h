@@ -6,7 +6,11 @@ Receive queue behavior. Similar to the transmit queue.
 struct DeviceContext;
 struct DeviceConfig;
 struct ChannelRegisters;
-auto constexpr RxBufferSize = 2048u;
+
+// NetAdapterCx appears to allocate fragment buffers in multiples of PAGE_SIZE,
+// so there's no reason to use a size smaller than this. 4KB buffers allow us
+// to receive jumbo packets up to 4088 bytes.
+auto constexpr RxBufferSize = 4096u;
 
 // Called by device.cpp AdapterCreateRxQueue.
 _IRQL_requires_same_
