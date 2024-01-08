@@ -84,6 +84,12 @@ HKR, Ndi\params\NetworkAddress,                  LimitText,      0, "12"
 HKR, Ndi\params\NetworkAddress,                  UpperCase,      0, "1"
 HKR, Ndi\params\NetworkAddress,                  Optional,       0, "1"
 
+HKR, Ndi\params\*JumboPacket,                    ParamDesc,      0, %JumboPacket%
+HKR, Ndi\params\*JumboPacket,                    type,           0, "int"
+HKR, Ndi\params\*JumboPacket,                    default,        0, "1514"
+HKR, Ndi\params\*JumboPacket,                    min,            0, "1514"
+HKR, Ndi\params\*JumboPacket,                    max,            0, "4088" ; TODO: 9014-byte jumbo frames.
+
 HKR, Ndi\params\*FlowControl,                    ParamDesc,      0,  %FlowControl%
 HKR, Ndi\params\*FlowControl,                    default,        0,  "3"
 HKR, Ndi\params\*FlowControl,                    type,           0,  "enum"
@@ -149,6 +155,7 @@ RKCP                = "Rockchip"
 DWCEQOS.DeviceDesc  = "Synopsys DesignWare Ethernet Quality of Service (GMAC)"
 DWCEQOS.ServiceDesc = "DesignWare Ethernet"
 NetworkAddress      = "Network Address"
+JumboPacket         = "Jumbo Packet"
 FlowControl         = "Flow Control"
 PriorityVlanTag     = "Packet Priority & VLAN"
 TCPUDPChecksumOffloadIPv4 = "TCP/UDP Checksum Offload (IPv4)"

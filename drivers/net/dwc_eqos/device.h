@@ -21,6 +21,7 @@ struct DeviceConfig
     UINT8 blen : 7;     // AXIC\snps,blen bitmask of 7 booleans 4..256 (default = 4, 8, 16).
     bool txFlowControl; // Adapter configuration (Ndi\params\*FlowControl).
     bool rxFlowControl; // Adapter configuration (Ndi\params\*FlowControl).
+    UINT16 jumboFrame;  // Adapter configuration (Ndi\params\*JumboFrame). 1514..4088
 };
 
 // Referenced in driver.cpp DriverEntry.

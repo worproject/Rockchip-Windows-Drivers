@@ -647,7 +647,7 @@ enum VlanTagStripOnReceive : UINT8
     VlanTagStripOnReceive_Always,
 };
 
-union Mac_Vlan_Tag_Ctrl_t
+union MacVlanTagCtrl_t
 {
     UINT32 Value32;
     struct
@@ -930,6 +930,20 @@ union MacTxFlowCtrl_t
     };
 };
 
+union MacWatchdogTimeout_t
+{
+    UINT32 Value32;
+    struct
+    {
+        UINT8 WatchdogTimeout; // WTO; effective timeout is (WatchdogTimeout * 1024) + 2048 bytes.
+
+        UINT8 ProgrammableWatchdogEnable : 1; // PWE
+        UINT8 Reserved9 : 7;
+        UINT8 Reserved16 : 8;
+        UINT8 Reserved24 : 8;
+    };
+};
+
 struct MacRegisters
 {
     // MAC_Configuration @ 0x0000 = 0x0:
@@ -949,7 +963,7 @@ struct MacRegisters
     // MAC_Watchdog_Timeout @ 0x000C = 0x0:
     // The Watchdog Timeout register controls the watchdog timeout for received
     // packets.
-    ULONG Mac_Watchdog_Timeout;
+    MacWatchdogTimeout_t Mac_Watchdog_Timeout;
 
     // MAC_Hash_Table_RegX @ 0x0010 = 0x0:
     // The Hash Table Register X contains the Xth 32 bits of the hash table.
@@ -961,7 +975,7 @@ struct MacRegisters
     // This register is the redefined format of the MAC VLAN Tag Register. It is used
     // for indirect addressing. It contains the address offset, command type and Busy
     // Bit for CSR access of the Per VLAN Tag registers.
-    Mac_Vlan_Tag_Ctrl_t Mac_Vlan_Tag_Ctrl;
+    MacVlanTagCtrl_t Mac_Vlan_Tag_Ctrl;
 
     // MAC_VLAN_Tag_Data @ 0x0054 = 0x0:
     // This register holds the read/write data for Indirect Access of the Per VLAN Tag

@@ -30,6 +30,8 @@ static auto constexpr BusBytes = 8u;
 static auto constexpr QueuesSupported = 1u; // TODO: Support multiple queues?
 static auto constexpr InterruptLinkStatus = 0x80000000u;
 static auto constexpr InterruptChannel0StatusMask = ~InterruptLinkStatus;
+static UINT16 constexpr JumboPacketMin = 1514u;
+static UINT16 constexpr JumboPacketMax = RxBufferSize - 8u; // 8 == VLAN + CRC. TODO: 9014-byte jumbo frames.
 
 // D637828D-556C-4829-966A-237072F00FF1
 static GUID constexpr DsmGuid = { 0xD637828D, 0x556C, 0x4829, 0x96, 0x6A, 0x23, 0x70, 0x72, 0xF0, 0x0F, 0xF1 };
@@ -637,16 +639,31 @@ DeviceD0Entry(
     macConfig.TransmitterEnable = true;
     macConfig.DisableCarrierSenseDuringTransmit = true;
     macConfig.DisableReceiveOwn = true;
+    macConfig.JabberDisable = context->config.jumboFrame > 2000;
     macConfig.PacketBurstEnable = true;
     //macConfig.PadOrCrcStripEnable = true;   // Why doesn't this work?
     //macConfig.CrcStripEnableForType = true; // Why doesn't this work?
+    macConfig.GiantPacketSizeLimitControlEnable = context->config.jumboFrame > JumboPacketMin;
     macConfig.ChecksumOffloadEnable = context->config.txCoeSel || context->config.rxCoeSel;
     Write32(&context->regs->Mac_Configuration, macConfig);
 
-    Mac_Vlan_Tag_Ctrl_t vlanTagCtrl = {};
+    MacExtConfiguration_t macExtConfig = {};
+    macExtConfig.GiantPacketSizeLimit = context->config.jumboFrame + 4; // Includes CRC, excludes VLAN.
+    Write32(&context->regs->Mac_Ext_Configuration, macExtConfig);
+
+    MacVlanTagCtrl_t vlanTagCtrl = {};
     vlanTagCtrl.StripOnReceive = VlanTagStripOnReceive_Always;
     vlanTagCtrl.RxStatusEnable = true;
     Write32(&context->regs->Mac_Vlan_Tag_Ctrl, vlanTagCtrl);
+
+    MacWatchdogTimeout_t watchdogTimeout = {};
+    // 0 = 2KB, 1 = 3KB, ... 14 = 16KB, 15 = Reserved.
+    // jumboFrame value doesn't include VLAN or CRC, so add 8.
+    // We want to round up a 1KB boundary, so add 1023.
+    // Example: If jumboFrame is 2040 then WatchdogTimeout = 0, but if jumboFrame is 2041 then WatchdogTimeout = 1.
+    watchdogTimeout.WatchdogTimeout = static_cast<UINT8>((context->config.jumboFrame + 8 + 1023) / 1024 - 2);
+    watchdogTimeout.ProgrammableWatchdogEnable = context->config.jumboFrame > 2000;
+    Write32(&context->regs->Mac_Watchdog_Timeout, watchdogTimeout);
 
     // Clear any pending interrupts, then unmask them.
 
@@ -715,6 +732,7 @@ DevicePrepareHardware(
     auto const context = DeviceGetContext(device);
     bool configHasMacAddress = false;
     ULONG flowControlConfiguration;
+    ULONG jumboPacketConfiguration;
 
     // Read configuration
 
@@ -755,13 +773,22 @@ DevicePrepareHardware(
             configHasMacAddress = true;
         }
 
-        DECLARE_CONST_UNICODE_STRING(FlowControl_Name, L"FlowControl");
+        DECLARE_CONST_UNICODE_STRING(FlowControl_Name, L"*FlowControl");
         status = NetConfigurationQueryUlong(configuration, NET_CONFIGURATION_QUERY_ULONG_NO_FLAGS, &FlowControl_Name, &flowControlConfiguration);
         if (!NT_SUCCESS(status))
         {
             TraceWrite("QueryFlowControl-not-found", LEVEL_VERBOSE,
                 TraceLoggingNTStatus(status));
             flowControlConfiguration = 3; // Default = TxRxEnabled
+        }
+
+        DECLARE_CONST_UNICODE_STRING(JumboPacket_Name, L"*JumboPacket");
+        status = NetConfigurationQueryUlong(configuration, NET_CONFIGURATION_QUERY_ULONG_NO_FLAGS, &JumboPacket_Name, &jumboPacketConfiguration);
+        if (!NT_SUCCESS(status))
+        {
+            TraceWrite("QueryJumboPacket-not-found", LEVEL_VERBOSE,
+                TraceLoggingNTStatus(status));
+            jumboPacketConfiguration = JumboPacketMin;
         }
     }
 
@@ -949,6 +976,10 @@ DevicePrepareHardware(
         context->config.wr_osr_lmt = 4;
         context->config.rd_osr_lmt = 8;
         context->config.blen = 0x7; // 0x7 = 4, 8, 16
+        context->config.jumboFrame = static_cast<UINT16>(
+            jumboPacketConfiguration < JumboPacketMin ? JumboPacketMin
+            : jumboPacketConfiguration > JumboPacketMax ? JumboPacketMax
+            : jumboPacketConfiguration);
 
         switch (flowControlConfiguration)
         {
@@ -1132,7 +1163,7 @@ DevicePrepareHardware(
             ? WdfDmaProfileScatterGather
             : WdfDmaProfileScatterGather64;
         WDF_DMA_ENABLER_CONFIG config;
-        WDF_DMA_ENABLER_CONFIG_INIT(&config, profile, 16384); // TODO: Jumbo packets.
+        WDF_DMA_ENABLER_CONFIG_INIT(&config, profile, 16384);
         config.WdmDmaVersionOverride = 3;
 
         switch (context->feature1.AddressWidth)
@@ -1183,7 +1214,7 @@ DevicePrepareHardware(
         NET_ADAPTER_LINK_LAYER_CAPABILITIES_INIT(&linkCaps, maxSpeed, maxSpeed);
         NetAdapterSetLinkLayerCapabilities(context->adapter, &linkCaps);
 
-        NetAdapterSetLinkLayerMtuSize(context->adapter, 1500); // TODO: Jumbo packets.
+        NetAdapterSetLinkLayerMtuSize(context->adapter, context->config.jumboFrame - 14);
 
         NET_ADAPTER_DMA_CAPABILITIES dmaCaps;
         NET_ADAPTER_DMA_CAPABILITIES_INIT(&dmaCaps, context->dma);
@@ -1193,8 +1224,8 @@ DevicePrepareHardware(
         NET_ADAPTER_TX_CAPABILITIES_INIT_FOR_DMA(&txCaps, &dmaCaps, QueuesSupported);
         txCaps.MaximumNumberOfFragments = QueueDescriptorMinCount - 2; // = 1 hole in the ring + 1 context descriptor.
 
-        NET_ADAPTER_RX_CAPABILITIES rxCaps; // TODO: Might use less memory if driver-managed.
-        NET_ADAPTER_RX_CAPABILITIES_INIT_SYSTEM_MANAGED_DMA(&rxCaps, &dmaCaps, RxBufferSize, QueuesSupported); // TODO: Jumbo packets.
+        NET_ADAPTER_RX_CAPABILITIES rxCaps; // TODO: 9014-byte jumbo frames probably require custom buffering.
+        NET_ADAPTER_RX_CAPABILITIES_INIT_SYSTEM_MANAGED_DMA(&rxCaps, &dmaCaps, RxBufferSize, QueuesSupported);
 
         NetAdapterSetDataPathCapabilities(context->adapter, &txCaps, &rxCaps);
 
