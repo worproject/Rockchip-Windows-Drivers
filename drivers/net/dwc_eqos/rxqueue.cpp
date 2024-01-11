@@ -22,6 +22,7 @@ struct RxQueueContext
     NET_EXTENSION packetChecksum;
     NET_EXTENSION fragmentLogical;
     UINT32 descCount;   // A power of 2 between QueueDescriptorMinCount and QueueDescriptorMaxCount.
+    UINT16 rxBufferSize;
     UINT8 rxPbl;
     bool running;
 
@@ -75,7 +76,7 @@ RxQueueStart(_In_ NETPACKETQUEUE queue)
 
     ChannelRxControl_t rxControl = {};
     rxControl.Start = true;
-    rxControl.ReceiveBufferSize = RxBufferSize;
+    rxControl.ReceiveBufferSize = context->rxBufferSize;
     rxControl.RxPbl = context->rxPbl;
     Write32(&context->channelRegs->Rx_Control, rxControl);
 
@@ -143,12 +144,12 @@ RxQueueAdvance(_In_ NETPACKETQUEUE queue)
 
         auto const frag = NetRingGetFragmentAtIndex(context->fragmentRing, fragIndex);
         frag->Offset = 0;
-        NT_ASSERT(RxBufferSize <= frag->Capacity);
+        NT_ASSERT(context->rxBufferSize <= frag->Capacity);
 
         if (descWrite.ErrorSummary ||
             descWrite.ContextType ||
             !descWrite.FirstDescriptor ||
-            !descWrite.LastDescriptor) // TODO: Jumbo frames (multi-descriptor packets)
+            !descWrite.LastDescriptor)
         {
             if (descWrite.ErrorSummary)
             {
@@ -238,7 +239,7 @@ RxQueueAdvance(_In_ NETPACKETQUEUE queue)
                 break;
             }
 
-            NT_ASSERT(RxBufferSize <= NetRingGetFragmentAtIndex(context->fragmentRing, fragIndex)->Capacity);
+            NT_ASSERT(context->rxBufferSize <= NetRingGetFragmentAtIndex(context->fragmentRing, fragIndex)->Capacity);
             auto const fragLogicalAddress = NetExtensionGetFragmentLogicalAddress(&context->fragmentLogical, fragIndex)->LogicalAddress;
 
             RxDescriptorRead descRead = {};
@@ -393,6 +394,7 @@ RxQueueCreate(
         context->packetRing = NetRingCollectionGetPacketRing(rings);
         context->fragmentRing = NetRingCollectionGetFragmentRing(rings);
         context->descCount = QueueDescriptorCount(context->fragmentRing->NumberOfElements);
+        context->rxBufferSize = deviceConfig.RxBufferSize();
         context->rxPbl = deviceConfig.rxPbl;
 
         TraceWrite("RxQueueCreate-size", LEVEL_VERBOSE,

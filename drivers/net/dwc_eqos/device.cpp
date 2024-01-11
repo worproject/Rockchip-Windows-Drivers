@@ -31,7 +31,7 @@ static auto constexpr QueuesSupported = 1u; // TODO: Support multiple queues?
 static auto constexpr InterruptLinkStatus = 0x80000000u;
 static auto constexpr InterruptChannel0StatusMask = ~InterruptLinkStatus;
 static UINT16 constexpr JumboPacketMin = 1514u;
-static UINT16 constexpr JumboPacketMax = RxBufferSize - 8u; // 8 == VLAN + CRC. TODO: 9014-byte jumbo frames.
+static UINT16 constexpr JumboPacketMax = 9014u;
 
 // D637828D-556C-4829-966A-237072F00FF1
 static GUID constexpr DsmGuid = { 0xD637828D, 0x556C, 0x4829, 0x96, 0x6A, 0x23, 0x70, 0x72, 0xF0, 0x0F, 0xF1 };
@@ -1224,8 +1224,10 @@ DevicePrepareHardware(
         NET_ADAPTER_TX_CAPABILITIES_INIT_FOR_DMA(&txCaps, &dmaCaps, QueuesSupported);
         txCaps.MaximumNumberOfFragments = QueueDescriptorMinCount - 2; // = 1 hole in the ring + 1 context descriptor.
 
-        NET_ADAPTER_RX_CAPABILITIES rxCaps; // TODO: 9014-byte jumbo frames probably require custom buffering.
-        NET_ADAPTER_RX_CAPABILITIES_INIT_SYSTEM_MANAGED_DMA(&rxCaps, &dmaCaps, RxBufferSize, QueuesSupported);
+        // TODO: Driver-managed buffering + multi-descriptor receive would
+        // reduce memory overhead of Jumbo Packets.
+        NET_ADAPTER_RX_CAPABILITIES rxCaps;
+        NET_ADAPTER_RX_CAPABILITIES_INIT_SYSTEM_MANAGED_DMA(&rxCaps, &dmaCaps, context->config.RxBufferSize(), QueuesSupported);
 
         NetAdapterSetDataPathCapabilities(context->adapter, &txCaps, &rxCaps);
 
