@@ -4,8 +4,6 @@
 
 /*
 Possible areas for improvement:
-- 9014-byte jumbo frames (current limit is 4088).
-  This probably requires custom receive buffer management.
 - Tx segmentation offload.
 - Run against network test suites and fix any issues.
 - Power control, wake-on-LAN, ARP offload.

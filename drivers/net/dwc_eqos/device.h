@@ -22,6 +22,12 @@ struct DeviceConfig
     bool txFlowControl; // Adapter configuration (Ndi\params\*FlowControl).
     bool rxFlowControl; // Adapter configuration (Ndi\params\*FlowControl).
     UINT16 jumboFrame;  // Adapter configuration (Ndi\params\*JumboFrame). 1514..4088
+
+    UINT16 RxBufferSize() const
+    {
+        UINT16 const frameSize = jumboFrame + 8u; // 8 = VLAN + CRC.
+        return (frameSize + 7u) & ~7u; // Round up to multiple of 8.
+    }
 };
 
 // Referenced in driver.cpp DriverEntry.

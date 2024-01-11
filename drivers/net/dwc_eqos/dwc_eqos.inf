@@ -88,7 +88,7 @@ HKR, Ndi\params\*JumboPacket,                    ParamDesc,      0, %JumboPacket
 HKR, Ndi\params\*JumboPacket,                    type,           0, "int"
 HKR, Ndi\params\*JumboPacket,                    default,        0, "1514"
 HKR, Ndi\params\*JumboPacket,                    min,            0, "1514"
-HKR, Ndi\params\*JumboPacket,                    max,            0, "4088" ; TODO: 9014-byte jumbo frames.
+HKR, Ndi\params\*JumboPacket,                    max,            0, "9014"
 
 HKR, Ndi\params\*FlowControl,                    ParamDesc,      0,  %FlowControl%
 HKR, Ndi\params\*FlowControl,                    default,        0,  "3"
