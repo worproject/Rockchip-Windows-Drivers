@@ -26,7 +26,7 @@ This repository contains drivers for RK35xx-based platforms, with a focus on RK3
 |Multimedia codecs||🔴 Not working||
 |DSI||🔴 Not working||
 |CSI||🔴 Not working||
-|GMAC Ethernet|[dwc_eqos](drivers/net/dwc_eqos)|🟢 Working|Requires latest UEFI (edk2-rk3588 master 2024/01/03 or later).<br> Note that this driver supports the on-chip Ethernet (e.g. it supports the 1GB Ethernet port on Opi5) but does not support the separate Ethernet chip that is added to some higher-tier boards (e.g. it does not support the 2.5GB Ethernet ports on Opi5+).
+|GMAC Ethernet|[dwc_eqos](drivers/net/dwc_eqos)|🟢 Working|Requires latest UEFI (edk2-rk3588 master 2024/01/03 or later).
 |RTL8111/RTL8168/RTL8125 Ethernet|[if_re](https://github.com/coolstar/if_re-win)|🟢 Working|
 |UART||🔴 Not working|No OS driver but debugging does work on UART2, being configured by UEFI.|
 |GPIO|[rk3xgpio](https://github.com/worproject/Rockchip-Windows-Drivers/tree/master/drivers/gpio)|🟢 Working||
