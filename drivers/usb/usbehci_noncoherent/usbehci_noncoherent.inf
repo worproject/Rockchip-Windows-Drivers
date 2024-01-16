@@ -1,0 +1,33 @@
+; Extension INF that enables the "NoInterlockedOpOnCommonBuffers" option for
+; usbehci. This option was introduced in Windows 11 2024.
+
+[Version]
+Signature   = "$Windows NT$"
+Class       = Extension
+ClassGuid   = {e2f84ce7-8efa-411c-aa69-97454ca4cb57}
+Provider    = %Provider%
+ExtensionId = {53e4ec2a-0b83-410f-b29c-1922fd636ca5}
+DriverVer   = ; provided by stampinf
+CatalogFile = usbehci_noncoherent.cat
+PnpLockdown = 1
+
+[Manufacturer]
+%Provider% = DeviceExtension,NTarm64
+
+[DeviceExtension.NTarm64]
+%ExtensionDesc% = DeviceExtension_Install, ACPI\PNP0D20
+
+[DeviceExtension_Install]
+; No changes
+
+[DeviceExtension_Install.HW]
+AddReg = NoInterlockedOp_AddReg
+
+[NoInterlockedOp_AddReg]
+HKR,, NoInterlockedOpOnCommonBuffers, 0x10001, 0x00000001
+HKR,, FriendlyName,, %FriendlyName%
+
+[Strings]
+Provider      = "Open Source"
+ExtensionDesc = "usbehci with NoInterlockedOpOnCommonBuffers"
+FriendlyName  = "Standard EHCI-compliant Host Controller (NCC)"
