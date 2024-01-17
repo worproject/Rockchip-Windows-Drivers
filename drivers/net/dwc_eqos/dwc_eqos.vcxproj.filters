@@ -84,4 +84,12 @@
       <Filter>Driver Files</Filter>
     </ResourceCompile>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="AutoLogger.reg">
+      <Filter>Driver Files</Filter>
+    </None>
+    <None Include="README.md">
+      <Filter>Driver Files</Filter>
+    </None>
+  </ItemGroup>
 </Project>

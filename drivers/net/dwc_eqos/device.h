@@ -8,8 +8,6 @@ struct DeviceContext; // TODO: if we do multi-queue, make a DeviceQueueContext s
 // Information about the device provided to the queues.
 struct DeviceConfig
 {
-    bool txCoeSel;      // MAC_HW_Feature0\TXCOESEL (hardware support for tx checksum offload).
-    bool rxCoeSel;      // MAC_HW_Feature0\RXCOESEL (hardware support for rx checksum offload).
     bool pblX8;         // _DSD\snps,pblx8 (default = 1).
     UINT8 pbl;          // _DSD\snps,pbl (default = 8; effect depends on pblX8).
     UINT8 txPbl;        // _DSD\snps,txpbl (default = pbl; effect depends on pblX8).
@@ -21,7 +19,7 @@ struct DeviceConfig
     UINT8 blen : 7;     // AXIC\snps,blen bitmask of 7 booleans 4..256 (default = 4, 8, 16).
     bool txFlowControl; // Adapter configuration (Ndi\params\*FlowControl).
     bool rxFlowControl; // Adapter configuration (Ndi\params\*FlowControl).
-    UINT16 jumboFrame;  // Adapter configuration (Ndi\params\*JumboFrame). 1514..4088
+    UINT16 jumboFrame;  // Adapter configuration (Ndi\params\*JumboFrame). 1514..9014.
 
     UINT16 RxBufferSize() const
     {

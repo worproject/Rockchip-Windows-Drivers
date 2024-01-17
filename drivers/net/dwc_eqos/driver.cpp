@@ -2,15 +2,6 @@
 #include "device.h"
 #include "trace.h"
 
-/*
-Possible areas for improvement:
-- Tx segmentation offload.
-- Run against network test suites and fix any issues.
-- Power control, wake-on-LAN, ARP offload.
-- Configure speed, duplex in Ndi\params.
-- Multi-queue support?
-*/
-
 TRACELOGGING_DEFINE_PROVIDER(
     TraceProvider,
     "dwc_eqos",

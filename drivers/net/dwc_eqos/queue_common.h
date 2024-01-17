@@ -3,9 +3,10 @@ Definitions shared between TxQueue and RxQueue.
 */
 #pragma once
 
-UINT32 constexpr QueueDescriptorSize = 64; // 64 == sizeof(TxDescriptor) == sizeof(RxDescriptor)
-UINT32 constexpr QueueDescriptorMinCount = PAGE_SIZE / QueueDescriptorSize; // Page granularity for allocation, might as well use the whole page.
-UINT32 constexpr QueueDescriptorMaxCount = 0x400; // Hardware limitation.
+UINT16 constexpr QueueDescriptorSize = 64; // 64 == sizeof(TxDescriptor) == sizeof(RxDescriptor)
+UINT16 constexpr QueueDescriptorMinCount = PAGE_SIZE / QueueDescriptorSize; // Page granularity for allocation, might as well use the whole page.
+UINT16 constexpr QueueDescriptorMaxCount = 0x400; // Hardware limitation.
+UINT16 constexpr QueueDescriptorLengthMax = 0x3FFF; // 14 bits.
 
 // Alignment is primarily to make sure the allocation does not cross a 4GB boundary.
 // It also simplifies the QueueDescriptorAddressToIndex implementation.

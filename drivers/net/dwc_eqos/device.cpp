@@ -574,6 +574,25 @@ AdapterOffloadSetRxChecksum(
         TraceLoggingBoolean(Udp));
 }
 
+static EVT_NET_ADAPTER_OFFLOAD_SET_GSO AdapterOffloadSetGso;
+static void
+AdapterOffloadSetGso(
+    _In_ NETADAPTER adapter,
+    _In_ NETOFFLOAD offload)
+{
+    // PASSIVE_LEVEL, nonpaged (resume path)
+    UNREFERENCED_PARAMETER(adapter);
+    auto const LsoIPv4 = NetOffloadIsLsoIPv4Enabled(offload);
+    auto const LsoIPv6 = NetOffloadIsLsoIPv6Enabled(offload);
+    auto const UsoIPv4 = NetOffloadIsUsoIPv4Enabled(offload);
+    auto const UsoIPv6 = NetOffloadIsUsoIPv6Enabled(offload);
+    TraceEntryExit(AdapterOffloadSetGso, LEVEL_INFO,
+        TraceLoggingBoolean(LsoIPv4),
+        TraceLoggingBoolean(LsoIPv6),
+        TraceLoggingBoolean(UsoIPv4),
+        TraceLoggingBoolean(UsoIPv6));
+}
+
 static EVT_WDF_DEVICE_D0_ENTRY DeviceD0Entry;
 static NTSTATUS
 DeviceD0Entry(
@@ -644,7 +663,7 @@ DeviceD0Entry(
     //macConfig.PadOrCrcStripEnable = true;   // Why doesn't this work?
     //macConfig.CrcStripEnableForType = true; // Why doesn't this work?
     macConfig.GiantPacketSizeLimitControlEnable = context->config.jumboFrame > JumboPacketMin;
-    macConfig.ChecksumOffloadEnable = context->config.txCoeSel || context->config.rxCoeSel;
+    macConfig.ChecksumOffloadEnable = true;
     Write32(&context->regs->Mac_Configuration, macConfig);
 
     MacExtConfiguration_t macExtConfig = {};
@@ -960,13 +979,35 @@ DevicePrepareHardware(
             status = STATUS_DEVICE_CONFIGURATION_ERROR;
             goto Done;
         }
+
+        if (!context->feature0.TxChecksumOffload)
+        {
+            // Could adapt at runtime if needed, but assume it's present for now.
+            TraceWrite("DevicePrepareHardware-TxChecksumOffload-required", LEVEL_ERROR);
+            status = STATUS_DEVICE_CONFIGURATION_ERROR;
+            goto Done;
+        }
+
+        if (!context->feature0.RxChecksumOffload)
+        {
+            // Could adapt at runtime if needed, but assume it's present for now.
+            TraceWrite("DevicePrepareHardware-RxChecksumOffload-required", LEVEL_ERROR);
+            status = STATUS_DEVICE_CONFIGURATION_ERROR;
+            goto Done;
+        }
+
+        if (!context->feature1.TsoEn)
+        {
+            // Could adapt at runtime if needed, but assume it's present for now.
+            TraceWrite("DevicePrepareHardware-TsoEn-required", LEVEL_ERROR);
+            status = STATUS_DEVICE_CONFIGURATION_ERROR;
+            goto Done;
+        }
     }
 
     // Device Config
 
     {
-        context->config.txCoeSel = context->feature0.TxChecksumOffload;
-        context->config.rxCoeSel = context->feature0.RxChecksumOffload;
         context->config.pblX8 = true;
         context->config.pbl = 8;
         context->config.txPbl = context->config.pbl;
@@ -1222,7 +1263,7 @@ DevicePrepareHardware(
 
         NET_ADAPTER_TX_CAPABILITIES txCaps;
         NET_ADAPTER_TX_CAPABILITIES_INIT_FOR_DMA(&txCaps, &dmaCaps, QueuesSupported);
-        txCaps.MaximumNumberOfFragments = QueueDescriptorMinCount - 2; // = 1 hole in the ring + 1 context descriptor.
+        txCaps.MaximumNumberOfFragments = TxMaximumNumberOfFragments;
 
         // TODO: Driver-managed buffering + multi-descriptor receive would
         // reduce memory overhead of Jumbo Packets.
@@ -1246,21 +1287,18 @@ DevicePrepareHardware(
             NetPacketFilterFlagPromiscuous;
         NetAdapterSetReceiveFilterCapabilities(context->adapter, &rxFilterCaps);
 
-        if (context->config.txCoeSel)
-        {
-            NET_ADAPTER_OFFLOAD_TX_CHECKSUM_CAPABILITIES txChecksumCaps;
-            NET_ADAPTER_OFFLOAD_TX_CHECKSUM_CAPABILITIES_INIT(&txChecksumCaps, {}, AdapterOffloadSetTxChecksum);
-            txChecksumCaps.Layer3Flags =
-                NetAdapterOffloadLayer3FlagIPv4NoOptions |
-                NetAdapterOffloadLayer3FlagIPv4WithOptions |
-                NetAdapterOffloadLayer3FlagIPv6NoExtensions |
-                NetAdapterOffloadLayer3FlagIPv6WithExtensions;
-            txChecksumCaps.Layer4Flags =
-                NetAdapterOffloadLayer4FlagTcpNoOptions |
-                NetAdapterOffloadLayer4FlagTcpWithOptions |
-                NetAdapterOffloadLayer4FlagUdp;
-            NetAdapterOffloadSetTxChecksumCapabilities(context->adapter, &txChecksumCaps);
-        }
+        NET_ADAPTER_OFFLOAD_TX_CHECKSUM_CAPABILITIES txChecksumCaps;
+        NET_ADAPTER_OFFLOAD_TX_CHECKSUM_CAPABILITIES_INIT(&txChecksumCaps,
+            NetAdapterOffloadLayer3FlagIPv4NoOptions |
+            NetAdapterOffloadLayer3FlagIPv4WithOptions |
+            NetAdapterOffloadLayer3FlagIPv6NoExtensions |
+            NetAdapterOffloadLayer3FlagIPv6WithExtensions,
+            AdapterOffloadSetTxChecksum);
+        txChecksumCaps.Layer4Flags =
+            NetAdapterOffloadLayer4FlagTcpNoOptions |
+            NetAdapterOffloadLayer4FlagTcpWithOptions |
+            NetAdapterOffloadLayer4FlagUdp;
+        NetAdapterOffloadSetTxChecksumCapabilities(context->adapter, &txChecksumCaps);
 
         NET_ADAPTER_OFFLOAD_RX_CHECKSUM_CAPABILITIES rxChecksumCaps;
         NET_ADAPTER_OFFLOAD_RX_CHECKSUM_CAPABILITIES_INIT(&rxChecksumCaps,
@@ -1272,6 +1310,21 @@ DevicePrepareHardware(
             NetAdapterOffloadIeee8021PriorityTaggingFlag |
             NetAdapterOffloadIeee8021VlanTaggingFlag);
         NetAdapterOffloadSetIeee8021qTagCapabilities(context->adapter, &ieee8021qCaps);
+
+        NET_ADAPTER_OFFLOAD_GSO_CAPABILITIES gsoCaps;
+        NET_ADAPTER_OFFLOAD_GSO_CAPABILITIES_INIT(&gsoCaps,
+            NetAdapterOffloadLayer3FlagIPv4NoOptions |
+            NetAdapterOffloadLayer3FlagIPv4WithOptions |
+            NetAdapterOffloadLayer3FlagIPv6NoExtensions |
+            NetAdapterOffloadLayer3FlagIPv6WithExtensions,
+            NetAdapterOffloadLayer4FlagUdp |
+            NetAdapterOffloadLayer4FlagTcpNoOptions |
+            NetAdapterOffloadLayer4FlagTcpWithOptions,
+            TxMaximumOffloadSize,
+            2, // MinimumSegmentCount
+            AdapterOffloadSetGso);
+        gsoCaps.Layer4HeaderOffsetLimit = TxLayer4HeaderOffsetLimit;
+        NetAdapterOffloadSetGsoCapabilities(context->adapter, &gsoCaps);
     }
 
     // Initialize adapter.

@@ -1,0 +1,12 @@
+﻿Windows Registry Editor Version 5.00
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Control\WMI\Autologger\dwc_eqos]
+"Guid"="{3fde989c-5470-4452-8f3c-91b0584f5a75}"
+"BufferSize"=dword:00000010
+"LogFileMode"=dword:08080400
+"Start"=dword:00000001
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Control\WMI\Autologger\dwc_eqos\{5d8331d3-70b3-5620-5664-db28f48a4b79}]
+"Enabled"=dword:00000001
+"EnableLevel"=dword:00000004
+"EnableFlags"=dword:00000003

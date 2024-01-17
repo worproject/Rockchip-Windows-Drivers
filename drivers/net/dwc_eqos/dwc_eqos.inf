@@ -96,7 +96,7 @@ HKR, Ndi\params\*FlowControl,                    type,           0,  "enum"
 HKR, Ndi\params\*FlowControl\enum,               "0",            0,  %Disabled%
 HKR, Ndi\params\*FlowControl\enum,               "1",            0,  %TxEnabled%
 HKR, Ndi\params\*FlowControl\enum,               "2",            0,  %RxEnabled%
-HKR, Ndi\params\*FlowControl\enum,               "3",            0,  %TxRxEnabled%
+HKR, Ndi\params\*FlowControl\enum,               "3",            0,  %RxTxEnabled%
 
 HKR, Ndi\Params\*PriorityVLANTag,                ParamDesc,      0,  %PriorityVlanTag%
 HKR, Ndi\Params\*PriorityVLANTag,                Default,        0,  "3"
@@ -106,21 +106,69 @@ HKR, Ndi\Params\*PriorityVLANTag\enum,           "1",            0,  %PriorityEn
 HKR, Ndi\Params\*PriorityVLANTag\enum,           "2",            0,  %VlanEnabled%
 HKR, Ndi\Params\*PriorityVLANTag\enum,           "3",            0,  %PriorityVlanEnabled%
 
-HKR, Ndi\params\*TCPUDPChecksumOffloadIPv4,      ParamDesc,      0,  %TCPUDPChecksumOffloadIPv4%
-HKR, Ndi\params\*TCPUDPChecksumOffloadIPv4,      default,        0,  "3"
-HKR, Ndi\params\*TCPUDPChecksumOffloadIPv4,      type,           0,  "enum"
-HKR, Ndi\params\*TCPUDPChecksumOffloadIPv4\enum, "0",            0,  %Disabled%
-HKR, Ndi\params\*TCPUDPChecksumOffloadIPv4\enum, "1",            0,  %TxEnabled%
-HKR, Ndi\params\*TCPUDPChecksumOffloadIPv4\enum, "2",            0,  %RxEnabled%
-HKR, Ndi\params\*TCPUDPChecksumOffloadIPv4\enum, "3",            0,  %TxRxEnabled%
+HKR, Ndi\params\*IPChecksumOffloadIPv4,          ParamDesc,      0,  %IPChecksumOffloadIPv4%
+HKR, Ndi\params\*IPChecksumOffloadIPv4,          default,        0,  "3"
+HKR, Ndi\params\*IPChecksumOffloadIPv4,          type,           0,  "enum"
+HKR, Ndi\params\*IPChecksumOffloadIPv4\enum,     "0",            0,  %Disabled%
+HKR, Ndi\params\*IPChecksumOffloadIPv4\enum,     "1",            0,  %TxEnabled%
+HKR, Ndi\params\*IPChecksumOffloadIPv4\enum,     "2",            0,  %RxEnabled%
+HKR, Ndi\params\*IPChecksumOffloadIPv4\enum,     "3",            0,  %RxTxEnabled%
 
-HKR, Ndi\params\*TCPUDPChecksumOffloadIPv6,      ParamDesc,      0,  %TCPUDPChecksumOffloadIPv6%
-HKR, Ndi\params\*TCPUDPChecksumOffloadIPv6,      default,        0,  "3"
-HKR, Ndi\params\*TCPUDPChecksumOffloadIPv6,      type,           0,  "enum"
-HKR, Ndi\params\*TCPUDPChecksumOffloadIPv6\enum, "0",            0,  %Disabled%
-HKR, Ndi\params\*TCPUDPChecksumOffloadIPv6\enum, "1",            0,  %TxEnabled%
-HKR, Ndi\params\*TCPUDPChecksumOffloadIPv6\enum, "2",            0,  %RxEnabled%
-HKR, Ndi\params\*TCPUDPChecksumOffloadIPv6\enum, "3",            0,  %TxRxEnabled%
+HKR, Ndi\params\*TCPChecksumOffloadIPv4,         ParamDesc,      0,  %TCPChecksumOffloadIPv4%
+HKR, Ndi\params\*TCPChecksumOffloadIPv4,         default,        0,  "3"
+HKR, Ndi\params\*TCPChecksumOffloadIPv4,         type,           0,  "enum"
+HKR, Ndi\params\*TCPChecksumOffloadIPv4\enum,    "0",            0,  %Disabled%
+HKR, Ndi\params\*TCPChecksumOffloadIPv4\enum,    "1",            0,  %TxEnabled%
+HKR, Ndi\params\*TCPChecksumOffloadIPv4\enum,    "2",            0,  %RxEnabled%
+HKR, Ndi\params\*TCPChecksumOffloadIPv4\enum,    "3",            0,  %RxTxEnabled%
+
+HKR, Ndi\params\*UDPChecksumOffloadIPv4,         ParamDesc,      0,  %UDPChecksumOffloadIPv4%
+HKR, Ndi\params\*UDPChecksumOffloadIPv4,         default,        0,  "3"
+HKR, Ndi\params\*UDPChecksumOffloadIPv4,         type,           0,  "enum"
+HKR, Ndi\params\*UDPChecksumOffloadIPv4\enum,    "0",            0,  %Disabled%
+HKR, Ndi\params\*UDPChecksumOffloadIPv4\enum,    "1",            0,  %TxEnabled%
+HKR, Ndi\params\*UDPChecksumOffloadIPv4\enum,    "2",            0,  %RxEnabled%
+HKR, Ndi\params\*UDPChecksumOffloadIPv4\enum,    "3",            0,  %RxTxEnabled%
+
+HKR, Ndi\params\*TCPChecksumOffloadIPv6,         ParamDesc,      0,  %TCPChecksumOffloadIPv6%
+HKR, Ndi\params\*TCPChecksumOffloadIPv6,         default,        0,  "3"
+HKR, Ndi\params\*TCPChecksumOffloadIPv6,         type,           0,  "enum"
+HKR, Ndi\params\*TCPChecksumOffloadIPv6\enum,    "0",            0,  %Disabled%
+HKR, Ndi\params\*TCPChecksumOffloadIPv6\enum,    "1",            0,  %TxEnabled%
+HKR, Ndi\params\*TCPChecksumOffloadIPv6\enum,    "2",            0,  %RxEnabled%
+HKR, Ndi\params\*TCPChecksumOffloadIPv6\enum,    "3",            0,  %RxTxEnabled%
+
+HKR, Ndi\params\*UDPChecksumOffloadIPv6,         ParamDesc,      0,  %UDPChecksumOffloadIPv6%
+HKR, Ndi\params\*UDPChecksumOffloadIPv6,         default,        0,  "3"
+HKR, Ndi\params\*UDPChecksumOffloadIPv6,         type,           0,  "enum"
+HKR, Ndi\params\*UDPChecksumOffloadIPv6\enum,    "0",            0,  %Disabled%
+HKR, Ndi\params\*UDPChecksumOffloadIPv6\enum,    "1",            0,  %TxEnabled%
+HKR, Ndi\params\*UDPChecksumOffloadIPv6\enum,    "2",            0,  %RxEnabled%
+HKR, Ndi\params\*UDPChecksumOffloadIPv6\enum,    "3",            0,  %RxTxEnabled%
+
+HKR, Ndi\Params\*LsoV2IPv4,                      ParamDesc,      0,  %LsoV2IPv4%
+HKR, Ndi\Params\*LsoV2IPv4,                      Type,           0,  "enum"
+HKR, Ndi\Params\*LsoV2IPv4,                      Default,        0,  "1"
+HKR, Ndi\Params\*LsoV2IPv4\enum,                 "0",            0,  %Disabled%
+HKR, Ndi\Params\*LsoV2IPv4\enum,                 "1",            0,  %Enabled%
+
+HKR, Ndi\Params\*LsoV2IPv6,                      ParamDesc,      0,  %LsoV2IPv6%
+HKR, Ndi\Params\*LsoV2IPv6,                      Type,           0,  "enum"
+HKR, Ndi\Params\*LsoV2IPv6,                      Default,        0,  "1"
+HKR, Ndi\Params\*LsoV2IPv6\enum,                 "0",            0,  %Disabled%
+HKR, Ndi\Params\*LsoV2IPv6\enum,                 "1",            0,  %Enabled%
+
+HKR, Ndi\Params\*UsoIPv4,                        ParamDesc,      0,  %UsoIPv4%
+HKR, Ndi\Params\*UsoIPv4,                        Type,           0,  "enum"
+HKR, Ndi\Params\*UsoIPv4,                        Default,        0,  "1"
+HKR, Ndi\Params\*UsoIPv4\enum,                   "0",            0,  %Disabled%
+HKR, Ndi\Params\*UsoIPv4\enum,                   "1",            0,  %Enabled%
+
+HKR, Ndi\Params\*UsoIPv6,                        ParamDesc,      0,  %UsoIPv6%
+HKR, Ndi\Params\*UsoIPv6,                        Type,           0,  "enum"
+HKR, Ndi\Params\*UsoIPv6,                        Default,        0,  "1"
+HKR, Ndi\Params\*UsoIPv6\enum,                   "0",            0,  %Disabled%
+HKR, Ndi\Params\*UsoIPv6\enum,                   "1",            0,  %Enabled%
 
 [DWCEQOS_Device.NT.Services]
 AddService = %ServiceName%, 2, DWCEQOS_AddService, DWCEQOS_AddService_EventLog
@@ -158,12 +206,20 @@ NetworkAddress      = "Network Address"
 JumboPacket         = "Jumbo Packet"
 FlowControl         = "Flow Control"
 PriorityVlanTag     = "Packet Priority & VLAN"
-TCPUDPChecksumOffloadIPv4 = "TCP/UDP Checksum Offload (IPv4)"
-TCPUDPChecksumOffloadIPv6 = "TCP/UDP Checksum Offload (IPv6)"
+IPChecksumOffloadIPv4  = "IPv4 Checksum Offload"
+TCPChecksumOffloadIPv4 = "TCP Checksum Offload (IPv4)"
+TCPChecksumOffloadIPv6 = "TCP Checksum Offload (IPv6)"
+UDPChecksumOffloadIPv4 = "UDP Checksum Offload (IPv4)"
+UDPChecksumOffloadIPv6 = "UDP Checksum Offload (IPv6)"
+LsoV2IPv4           = "Large Send Offload V2 (IPv4)"
+LsoV2IPv6           = "Large Send Offload V2 (IPv6)"
+UsoIPv4             = "UDP Segmentation Offload (IPv4)"
+UsoIPv6             = "UDP Segmentation Offload (IPV6)"
 Disabled            = "Disabled"
+Enabled             = "Enabled"
 TxEnabled           = "Tx Enabled"
 RxEnabled           = "Rx Enabled"
-TxRxEnabled         = "Tx and Rx Enabled"
+RxTxEnabled         = "Rx & Tx Enabled"
 PriorityEnabled     = "Packet Priority Enabled"
 VlanEnabled         = "VLAN Enabled"
 PriorityVlanEnabled = "Packet Priority & VLAN Enabled"
