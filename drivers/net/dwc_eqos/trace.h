@@ -8,9 +8,11 @@ Collect traces using something like:
     tracefmt FileName.etl
 
 Send traces to KD by running "!wmitrace.dynamicprint 1" in WinDbg and starting a trace
-session with -kd enabled, either via trace tool or via autologger:
+session with -kd enabled, either via trace tool,
 
     tracelog -start SessionName -guid *dwc_eqos -level 4 -kd
+
+or by setting up a boot-start session using the AutoLogger.reg file in this project.
 */
 #pragma once
 

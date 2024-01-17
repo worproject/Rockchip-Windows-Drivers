@@ -21,6 +21,14 @@ enum TxChecksumInsertion : UINT16
     TxChecksumInsertionEnabledIncludingPseudo = 3,
 };
 
+enum TxVlanTagControl : UINT16
+{
+    TxVlanTagControlNone = 0,
+    TxVlanTagControlRemove = 1,
+    TxVlanTagControlInsert = 2,
+    TxVlanTagControlReplace = 3,
+};
+
 struct TxDescriptorRead
 {
     // TDES0, TDES1
@@ -31,7 +39,7 @@ struct TxDescriptorRead
     // TDES2
 
     UINT16 Buf1Length : 14; // B1L
-    UINT16 VlanTagControl : 2; // VTIR
+    TxVlanTagControl VlanTagControl : 2; // VTIR
 
     UINT16 Buf2Length : 14; // B2L
     UINT16 TransmitTimestampEnable : 1; // TTSE
@@ -68,7 +76,7 @@ struct TxDescriptorReadTso
     // TDES2
 
     UINT16 Buf1Length : 14; // B1L (10-bit header length if FD = 1)
-    UINT16 VlanTagControl : 2; // VTIR
+    TxVlanTagControl VlanTagControl : 2; // VTIR
 
     UINT16 Buf2Length : 14; // B2L
     UINT16 TsoMemoryWriteDisable : 1; // TMWD
@@ -77,7 +85,7 @@ struct TxDescriptorReadTso
     // TDES3
 
     UINT32 TcpPayloadLength : 18; // TPL
-    UINT32 TcpSegmentationEnable : 1; // TSE = 0
+    UINT32 TcpSegmentationEnable : 1; // TSE = 1
     UINT32 TcpHeaderLength : 4; // TCP/UDP header length (must be 2 for UDP)
     UINT32 SourceAddressInsertionControl : 3; // SAIC
     UINT32 Reserved26 : 2; // CPC, ignored when TSE = 1
@@ -159,7 +167,7 @@ struct TxDescriptorContext
 
     UINT8 VlanTagValid : 1; // VLTV
     UINT8 InnerVlanTagValid : 1; // IVLTV
-    UINT8 InnverVlanTagControl : 2; // IVTIR
+    UINT8 InnerVlanTagControl : 2; // IVTIR
     UINT8 Reserved20 : 3;
     UINT8 DescriptorError : 1; // DE
 

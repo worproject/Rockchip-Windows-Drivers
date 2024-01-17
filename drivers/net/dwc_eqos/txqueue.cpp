@@ -19,13 +19,14 @@ struct TxQueueContext
     TxDescriptor* descVirtual;
     PHYSICAL_ADDRESS descPhysical;
     NET_EXTENSION packetIeee8021Q;
+    NET_EXTENSION packetGso;
     NET_EXTENSION packetChecksum;
     NET_EXTENSION fragmentLogical;
     UINT32 descCount;   // A power of 2 between QueueDescriptorMinCount and QueueDescriptorMaxCount.
     UINT8 txPbl;
-    bool txChecksumOffload;
 
-    UINT16 lastVlanTag;
+    UINT16 lastMss;     // MSS set by the most recent context descriptor.
+    UINT16 lastVlanTag; // VLAN tag set by the most recent context descriptor.
     UINT32 descBegin;   // Start of the TRANSMIT region.
     UINT32 descEnd;     // End of the TRANSMIT region, start of the EMPTY region.
 };
@@ -64,6 +65,7 @@ TxQueueStart(_In_ NETPACKETQUEUE queue)
     // PASSIVE_LEVEL, nonpaged (resume path)
     auto const context = TxQueueGetContext(queue);
 
+    context->lastMss = 0; // Make no assumptions about the device's current MSS.
     context->lastVlanTag = 0; // Make no assumptions about the device's current vlan tag.
     context->descBegin = 0;
     context->descEnd = 0;
@@ -81,6 +83,8 @@ TxQueueStart(_In_ NETPACKETQUEUE queue)
     ChannelTxControl_t txControl = {};
     txControl.Start = true;
     txControl.OperateOnSecondPacket = true;
+    txControl.TcpSegmentation = true;
+    txControl.TcpSegmentationMode = 0; // TSO+USO mode.
     txControl.TxPbl = context->txPbl;
     Write32(&context->channelRegs->Tx_Control, txControl);
 
@@ -88,27 +92,26 @@ TxQueueStart(_In_ NETPACKETQUEUE queue)
 }
 
 // Starting at pktIndex, scan forward until we reach packetRing->NextIndex or a
-// non-ignored packet. If we reach a non-ignored packet, sets *pktLastFrag to the last
-// fragment of the found packet and returns the packet's index. Otherwise, sets
-// *pktLastFrag to 0xFFFFFFFF and returns packetRing->NextIndex.
+// non-ignored packet. If we reach a non-ignored packet, set *pktFragIndex to
+// pkt->FragmentIndex andreturn the packet's index. Otherwise, leave
+// *pktFragIndex unmodified and return packetRing->NextIndex.
 static UINT32
-SkipIgnorePackets(UINT32 pktIndex, _In_ TxQueueContext const* context, _Out_ UINT32* pktLastFrag)
+SkipIgnorePackets(_In_ NET_RING const* packetRing, UINT32 pktIndex, _Inout_ UINT32* pktFragIndex)
 {
     // DISPATCH_LEVEL
-    auto const pktNext = context->packetRing->NextIndex;
-    for (; pktIndex != pktNext; pktIndex = NetRingIncrementIndex(context->packetRing, pktIndex))
+    auto const pktNext = packetRing->NextIndex;
+    for (; pktIndex != pktNext; pktIndex = NetRingIncrementIndex(packetRing, pktIndex))
     {
-        auto const pkt = NetRingGetPacketAtIndex(context->packetRing, pktIndex);
+        auto const pkt = NetRingGetPacketAtIndex(packetRing, pktIndex);
         if (!pkt->Ignore)
         {
             NT_ASSERT(pkt->FragmentCount != 0);
-            *pktLastFrag = NetRingAdvanceIndex(context->fragmentRing, pkt->FragmentIndex, pkt->FragmentCount - 1u);
-            return pktIndex;
+            *pktFragIndex = pkt->FragmentIndex;
+            break;
         }
     }
 
-    *pktLastFrag = 0xFFFFFFFF;
-    return pktNext;
+    return pktIndex;
 }
 
 static EVT_PACKET_QUEUE_ADVANCE TxQueueAdvance;
@@ -119,7 +122,7 @@ TxQueueAdvance(_In_ NETPACKETQUEUE queue)
     auto const context = TxQueueGetContext(queue);
     auto const descMask = context->descCount - 1u;
     auto const descEnd = context->descEnd;
-    UINT32 descIndex, pktIndex, pktLastFrag, fragIndex;
+    UINT32 descIndex, pktIndex, pktFragIndex;
     UINT32 doneFrags = 0, queuedFrags = 0;
 
     /*
@@ -133,13 +136,12 @@ TxQueueAdvance(_In_ NETPACKETQUEUE queue)
     // Indicate transmitted packets.
 
     // Process any descriptors that the adapter has handed back to us.
-    // Release the corresponding fragments and packets.
-    pktIndex = SkipIgnorePackets(context->packetRing->BeginIndex, context, &pktLastFrag);
-    fragIndex = context->fragmentRing->BeginIndex;
+    pktFragIndex = context->fragmentRing->BeginIndex;
+    pktIndex = context->packetRing->BeginIndex;
+    pktIndex = SkipIgnorePackets(context->packetRing, pktIndex, &pktFragIndex);
     for (descIndex = context->descBegin; descIndex != descEnd; descIndex = (descIndex + 1) & descMask)
     {
         NT_ASSERT(pktIndex != context->packetRing->NextIndex);
-        NT_ASSERT(pktLastFrag != 0xFFFFFFFF);
 
         auto const& desc = context->descVirtual[descIndex];
         auto const descWrite = desc.Write;
@@ -151,7 +153,6 @@ TxQueueAdvance(_In_ NETPACKETQUEUE queue)
         }
 
         NT_ASSERT(descWrite.PacketIndex == pktIndex);
-        NT_ASSERT(descWrite.FragmentIndex == fragIndex);
 
         if (descWrite.ContextType)
         {
@@ -159,33 +160,29 @@ TxQueueAdvance(_In_ NETPACKETQUEUE queue)
             continue;
         }
 
-        if (descWrite.ErrorSummary ||
-            descWrite.ContextType ||
-            descWrite.DescriptorError ||
-            (descWrite.LastDescriptor != 0) != (fragIndex == pktLastFrag))
+        if (descWrite.LastDescriptor)
         {
-            TraceWrite("TxQueueAdvance-error", LEVEL_ERROR,
-                TraceLoggingUInt32(descIndex),
-                TraceLoggingHexInt32(reinterpret_cast<UINT32 const*>(&descWrite)[3], "TDES3"),
-                TraceLoggingUInt32(fragIndex),
-                TraceLoggingUInt32(pktLastFrag));
-        }
+            if (descWrite.ErrorSummary ||
+                descWrite.ContextType ||
+                descWrite.DescriptorError)
+            {
+                TraceWrite("TxQueueAdvance-error", LEVEL_ERROR,
+                    TraceLoggingUInt32(descIndex),
+                    TraceLoggingHexInt32(reinterpret_cast<UINT32 const*>(&descWrite)[3], "TDES3"),
+                    TraceLoggingUInt32(pktIndex));
+            }
 
-        // Non-context descriptors map one-to-one with fragments.
-
-        if (fragIndex == pktLastFrag)
-        {
             // Packet is complete. Move to the next one.
-            pktIndex = SkipIgnorePackets(NetRingIncrementIndex(context->packetRing, pktIndex), context, &pktLastFrag);
+            auto const pkt = NetRingGetPacketAtIndex(context->packetRing, pktIndex);
+            pktFragIndex = NetRingAdvanceIndex(context->fragmentRing, pkt->FragmentIndex, pkt->FragmentCount);
+            pktIndex = NetRingIncrementIndex(context->packetRing, pktIndex);
+            pktIndex = SkipIgnorePackets(context->packetRing, pktIndex, &pktFragIndex);
         }
-
-        // Fragment is complete. Move to the next one.
-        fragIndex = NetRingIncrementIndex(context->fragmentRing, fragIndex);
     }
 
     // Return the completed packets and fragments to NetAdapterCx.
     context->packetRing->BeginIndex = pktIndex;
-    context->fragmentRing->BeginIndex = fragIndex;
+    context->fragmentRing->BeginIndex = pktFragIndex;
 
     auto const descBegin = descIndex;
     context->descBegin = descBegin;
@@ -194,15 +191,12 @@ TxQueueAdvance(_In_ NETPACKETQUEUE queue)
 
     pktIndex = context->packetRing->NextIndex;
 
-    // Number of EMPTY is (descBegin-1) - descEnd (wrapping around if necessary).
     auto const pktEnd = context->packetRing->EndIndex;
-    auto const txChecksumOffload = context->txChecksumOffload;
-    auto descEmpty = (descBegin - 1 - descEnd) & descMask;
     descIndex = descEnd;
-    while (descEmpty != 0)
-    {
-        NT_ASSERT(descIndex != ((descBegin - 1) & descMask));
 
+#define EMPTY_DESC_REMAINING(descIndex) ((descBegin - 1u - descIndex) & descMask) // -1 because ring has a hole.
+    while (EMPTY_DESC_REMAINING(descIndex) != 0)
+    {
         if (pktIndex == pktEnd)
         {
             break;
@@ -211,100 +205,246 @@ TxQueueAdvance(_In_ NETPACKETQUEUE queue)
         auto const pkt = NetRingGetPacketAtIndex(context->packetRing, pktIndex);
         if (!pkt->Ignore)
         {
-            fragIndex = pkt->FragmentIndex;
-
-            // If checksum offload is disabled by hardware then we can't call
-            // NetExtensionGetPacketChecksum because device.cpp didn't call
-            // NetAdapterOffloadSetTxChecksumCapabilities.
-            // If offload is disabled by software then the extension will be zeroed.
-            auto const checksum = txChecksumOffload
-                ? *NetExtensionGetPacketChecksum(&context->packetChecksum, pktIndex)
-                : NET_PACKET_CHECKSUM{}; // Disabled by hardware.
-            auto const checksumInsertion =
-                checksum.Layer4 ? TxChecksumInsertionEnabledIncludingPseudo
-                : checksum.Layer3 ? TxChecksumInsertionEnabledHeaderOnly
-                : TxChecksumInsertionDisabled;
+            UINT32 fragIndex = pkt->FragmentIndex;
 
             UINT32 const fragmentCount = pkt->FragmentCount;
             NT_ASSERT(fragmentCount != 0);
 
-            auto const ieee8021Q = NetExtensionGetPacketIeee8021Q(&context->packetIeee8021Q, pktIndex);
-            if (ieee8021Q->TxTagging != 0)
+            auto const ieee8021Q = *NetExtensionGetPacketIeee8021Q(&context->packetIeee8021Q, pktIndex);
+
+            auto const gso = NetExtensionGetPacketGso(&context->packetGso, pktIndex);
+            NT_ASSERT(gso->TCP.Mss <= 0x3FFF); // 14 bits
+            auto const gsoMss = static_cast<UINT16>(gso->TCP.Mss);
+            auto const vlanTagControl = ieee8021Q.TxTagging != 0 ? TxVlanTagControlInsert : TxVlanTagControlNone;
+
+            if (gsoMss != 0) // segmentation offload enabled
             {
-                UINT16 const newTag = (ieee8021Q->PriorityCodePoint << 13) | ieee8021Q->VlanIdentifier;
-                NT_ASSERT(newTag != 0);
-                if (newTag == context->lastVlanTag)
+                auto const layout = pkt->Layout;
+                NT_ASSERT(layout.Layer4Type == NetPacketLayer4TypeTcp || layout.Layer4Type == NetPacketLayer4TypeUdp);
+                if (layout.Layer4Type == NetPacketLayer4TypeTcp)
                 {
-                    goto NoContextPacket;
+                    NT_ASSERT(layout.Layer4HeaderLength >= 4u * 5u);
+                    NT_ASSERT(layout.Layer4HeaderLength <= 4u * 15u);
+                }
+                else
+                {
+                    NT_ASSERT(layout.Layer4HeaderLength == sizeof(UINT32) * 2u);
                 }
 
-                if (fragmentCount + 1 > descEmpty)
+                // TSO/USO: Headers up to the payload.
+                UINT16 const headerLength = layout.Layer2HeaderLength + layout.Layer3HeaderLength + layout.Layer4HeaderLength;
+                NT_ASSERT(headerLength <= TxLayer4HeaderOffsetLimit);
+
+                UINT32 packetLength = 0;
+                unsigned userDescriptorsNeeded = 0;
+                for (unsigned i = 0, fragIndex2 = fragIndex; i != fragmentCount; i += 1)
                 {
+                    auto const fragLength = static_cast<UINT32>(NetRingGetFragmentAtIndex(context->fragmentRing, fragIndex2)->ValidLength);
+                    packetLength += fragLength;
+                    userDescriptorsNeeded += (fragLength + QueueDescriptorLengthMax - 1u) / QueueDescriptorLengthMax;
+                    NT_ASSERT(packetLength <= TxMaximumOffloadSize + headerLength);
+                    fragIndex2 = NetRingIncrementIndex(context->fragmentRing, fragIndex2);
+                }
+                NT_ASSERT(headerLength <= packetLength);
+                NT_ASSERT(userDescriptorsNeeded <= TxMaximumNumberOfFragments);
+
+                UINT16 newTag;
+                if (ieee8021Q.TxTagging != 0)
+                {
+                    newTag = (ieee8021Q.PriorityCodePoint << 13) | ieee8021Q.VlanIdentifier;
+                    NT_ASSERT(newTag != 0);
+                }
+                else
+                {
+                    newTag = context->lastVlanTag;
+                }
+
+                bool const contextTagNeeded = newTag != context->lastVlanTag;
+                bool const contextMssNeeded = gsoMss != context->lastMss;
+                bool const contextNeeded = contextTagNeeded || contextMssNeeded;
+
+                // We might need a context descriptor.
+                // We will need a header descriptor.
+                if (userDescriptorsNeeded + contextNeeded + 1u > EMPTY_DESC_REMAINING(descIndex))
+                {
+                    // Wait until more descriptors are free.
                     break;
                 }
 
-                TxDescriptorContext descCtx = {};
-                descCtx.VlanTag = newTag;
-                descCtx.VlanTagValid = true;
-                descCtx.ContextType = true;
-                descCtx.Own = true;
+                if (contextNeeded)
+                {
+                    TxDescriptorContext descCtx = {};
+                    descCtx.MaximumSegmentSize = gsoMss;
+                    descCtx.VlanTag = newTag;
+                    descCtx.VlanTagValid = contextTagNeeded;
+                    descCtx.OneStepInputOrMssValid = true;
+                    descCtx.ContextType = true;
+                    descCtx.Own = true;
 #if DBG
-                descCtx.PacketIndex = pktIndex;
-                descCtx.FragmentIndex = fragIndex;
+                    descCtx.PacketIndex = pktIndex;
+                    descCtx.FragmentIndex = fragIndex;
 #endif
 
-                context->descVirtual[descIndex].Context = descCtx;
-                descIndex = (descIndex + 1) & descMask;
-                descEmpty -= 1;
-            }
-            else
-            {
-            NoContextPacket:
+                    NT_ASSERT(EMPTY_DESC_REMAINING(descIndex) != 0);
+                    context->descVirtual[descIndex].Context = descCtx;
+                    descIndex = (descIndex + 1) & descMask;
+                    context->lastMss = gsoMss;
+                    context->lastVlanTag = newTag;
+                }
 
-                if (fragmentCount > descEmpty)
+                auto const frag0LogicalAddress = NetExtensionGetFragmentLogicalAddress(&context->fragmentLogical, fragIndex)->LogicalAddress;
+                NT_ASSERT(headerLength <= NetRingGetFragmentAtIndex(context->fragmentRing, fragIndex)->ValidLength);
+
+                TxDescriptorReadTso descTso = {};
+                descTso.Buf1Ap = static_cast<UINT32>(frag0LogicalAddress);
+                descTso.Buf2Ap = static_cast<UINT32>(frag0LogicalAddress >> 32);
+                descTso.Buf1Length = headerLength;
+                descTso.VlanTagControl = vlanTagControl;
+                descTso.TcpPayloadLength = packetLength - headerLength;
+                descTso.TcpSegmentationEnable = true;
+                descTso.TcpHeaderLength = layout.Layer4HeaderLength / 4u;
+                descTso.FirstDescriptor = true;
+                descTso.Own = true;
+#if DBG
+                descTso.PacketIndex = pktIndex;
+                descTso.FragmentIndex = fragIndex;
+#endif
+
+                NT_ASSERT(EMPTY_DESC_REMAINING(descIndex) != 0);
+                context->descVirtual[descIndex].ReadTso = descTso;
+                descIndex = (descIndex + 1) & descMask;
+
+                unsigned nextFragmentStart = headerLength;
+                for (unsigned i = 0; i != fragmentCount; i += 1)
                 {
-                    break;
+                    unsigned fragPos = nextFragmentStart; // Skip header for first fragment.
+                    nextFragmentStart = 0; // Don't skip header for subsequent fragments.
+                    auto const frag = NetRingGetFragmentAtIndex(context->fragmentRing, fragIndex);
+                    auto const fragLogicalAddress = NetExtensionGetFragmentLogicalAddress(&context->fragmentLogical, fragIndex)->LogicalAddress;
+                    auto const fragLength = static_cast<UINT32>(frag->ValidLength);
+                    NT_ASSERT(fragLength != 0); // Otherwise we might not set LastDescriptor.
+
+                    while (fragPos != fragLength)
+                    {
+                        auto const bufLogicalAddress = fragLogicalAddress + fragPos;
+                        auto const bufLength = fragLength - fragPos < QueueDescriptorLengthMax
+                            ? static_cast<UINT16>(fragLength - fragPos)
+                            : QueueDescriptorLengthMax;
+                        fragPos += bufLength;
+                        auto const lastDesc = fragPos == fragLength && i == fragmentCount - 1u;
+
+                        TxDescriptorRead descRead = {};
+                        descRead.Buf1Ap = static_cast<UINT32>(bufLogicalAddress);
+                        descRead.Buf2Ap = static_cast<UINT32>(bufLogicalAddress >> 32);
+                        descRead.Buf1Length = bufLength;
+                        descRead.VlanTagControl = vlanTagControl;
+                        descRead.InterruptOnCompletion = lastDesc;
+                        descRead.LastDescriptor = lastDesc;
+                        descRead.FirstDescriptor = false;
+                        descRead.Own = true;
+#if DBG
+                        descRead.PacketIndex = pktIndex;
+                        descRead.FragmentIndex = fragIndex;
+#endif
+
+                        NT_ASSERT(EMPTY_DESC_REMAINING(descIndex) != 0);
+                        context->descVirtual[descIndex].Read = descRead;
+                        descIndex = (descIndex + 1) & descMask;
+                    }
+
+                    fragIndex = NetRingIncrementIndex(context->fragmentRing, fragIndex);
+                    queuedFrags += 1;
                 }
             }
-
-            UINT32 frameLength = 0;
-            for (unsigned i = 0, fragIndex2 = fragIndex; i != fragmentCount; i += 1)
+            else // segmentation offload disabled
             {
-                frameLength += NetRingGetFragmentAtIndex(context->fragmentRing, fragIndex2)->ValidLength & 0x03FFFFFF; // 26 bits
-                fragIndex2 = NetRingIncrementIndex(context->fragmentRing, fragIndex2);
-            }
-            NT_ASSERT(frameLength <= 0x7FFF);
-            frameLength &= 0x7FFF;
+                // If offload is disabled by software then the extension will be zeroed.
+                auto const checksum = *NetExtensionGetPacketChecksum(&context->packetChecksum, pktIndex);
+                auto const checksumInsertion =
+                    checksum.Layer4 ? TxChecksumInsertionEnabledIncludingPseudo
+                    : checksum.Layer3 ? TxChecksumInsertionEnabledHeaderOnly
+                    : TxChecksumInsertionDisabled;
 
-            for (unsigned i = 0; i != fragmentCount; i += 1)
-            {
-                auto const frag = NetRingGetFragmentAtIndex(context->fragmentRing, fragIndex);
-                NT_ASSERT(frag->ValidLength <= frag->Capacity - frag->Offset);
-                auto const fragLogicalAddress = NetExtensionGetFragmentLogicalAddress(&context->fragmentLogical, fragIndex)->LogicalAddress;
+                if (ieee8021Q.TxTagging != 0)
+                {
+                    UINT16 const newTag = (ieee8021Q.PriorityCodePoint << 13) | ieee8021Q.VlanIdentifier;
+                    NT_ASSERT(newTag != 0);
+                    if (newTag == context->lastVlanTag)
+                    {
+                        goto NoContextPacket;
+                    }
 
-                TxDescriptorRead descRead = {};
-                descRead.Buf1Ap = static_cast<UINT32>(fragLogicalAddress);
-                descRead.Buf2Ap = static_cast<UINT32>(fragLogicalAddress >> 32);
-                NT_ASSERT(frag->ValidLength <= 0x3FFF); // 14 bits
-                descRead.Buf1Length = frag->ValidLength & 0x3FFF;
-                descRead.InterruptOnCompletion = i == fragmentCount - 1u;
-                descRead.FrameLength = static_cast<UINT16>(frameLength);
-                descRead.ChecksumInsertion = checksumInsertion;
-                descRead.LastDescriptor = i == fragmentCount - 1u;
-                descRead.FirstDescriptor = i == 0;
-                descRead.Own = true;
+                    // We will need a context descriptor.
+                    if (fragmentCount + 1u > EMPTY_DESC_REMAINING(descIndex))
+                    {
+                        // Wait until more descriptors are free.
+                        break;
+                    }
+
+                    TxDescriptorContext descCtx = {};
+                    descCtx.MaximumSegmentSize = context->lastMss;
+                    descCtx.VlanTag = newTag;
+                    descCtx.VlanTagValid = true;
+                    descCtx.ContextType = true;
+                    descCtx.Own = true;
 #if DBG
-                descRead.PacketIndex = pktIndex;
-                descRead.FragmentIndex = fragIndex;
+                    descCtx.PacketIndex = pktIndex;
+                    descCtx.FragmentIndex = fragIndex;
 #endif
 
-                context->descVirtual[descIndex].Read = descRead;
-                descIndex = (descIndex + 1) & descMask;
-                fragIndex = NetRingIncrementIndex(context->fragmentRing, fragIndex);
-                queuedFrags += 1;
-            }
+                    NT_ASSERT(EMPTY_DESC_REMAINING(descIndex) != 0);
+                    context->descVirtual[descIndex].Context = descCtx;
+                    descIndex = (descIndex + 1) & descMask;
+                    context->lastVlanTag = newTag;
+                }
+                else
+                {
+                NoContextPacket:
 
-            descEmpty -= fragmentCount;
+                    if (fragmentCount > EMPTY_DESC_REMAINING(descIndex))
+                    {
+                        // Wait until more descriptors are free.
+                        break;
+                    }
+                }
+
+                UINT32 frameLength = 0;
+                for (unsigned i = 0, fragIndex2 = fragIndex; i != fragmentCount; i += 1)
+                {
+                    frameLength += static_cast<UINT32>(NetRingGetFragmentAtIndex(context->fragmentRing, fragIndex2)->ValidLength);
+                    NT_ASSERT(frameLength <= 0x7FFF);
+                    fragIndex2 = NetRingIncrementIndex(context->fragmentRing, fragIndex2);
+                }
+
+                for (unsigned i = 0; i != fragmentCount; i += 1)
+                {
+                    auto const frag = NetRingGetFragmentAtIndex(context->fragmentRing, fragIndex);
+                    auto const fragLogicalAddress = NetExtensionGetFragmentLogicalAddress(&context->fragmentLogical, fragIndex)->LogicalAddress;
+
+                    TxDescriptorRead descRead = {};
+                    descRead.Buf1Ap = static_cast<UINT32>(fragLogicalAddress);
+                    descRead.Buf2Ap = static_cast<UINT32>(fragLogicalAddress >> 32);
+                    NT_ASSERT(frag->ValidLength <= QueueDescriptorLengthMax); // 14 bits
+                    descRead.Buf1Length = frag->ValidLength;
+                    descRead.VlanTagControl = vlanTagControl;
+                    descRead.InterruptOnCompletion = i == fragmentCount - 1u;
+                    descRead.FrameLength = static_cast<UINT16>(frameLength);
+                    descRead.ChecksumInsertion = checksumInsertion;
+                    descRead.LastDescriptor = i == fragmentCount - 1u;
+                    descRead.FirstDescriptor = i == 0;
+                    descRead.Own = true;
+#if DBG
+                    descRead.PacketIndex = pktIndex;
+                    descRead.FragmentIndex = fragIndex;
+#endif
+
+                    NT_ASSERT(EMPTY_DESC_REMAINING(descIndex) != 0);
+                    context->descVirtual[descIndex].Read = descRead;
+                    descIndex = (descIndex + 1) & descMask;
+                    fragIndex = NetRingIncrementIndex(context->fragmentRing, fragIndex);
+                    queuedFrags += 1;
+                }
+            } // segmentation offload enabled/disabled
         }
 
         pktIndex = NetRingIncrementIndex(context->packetRing, pktIndex);
@@ -496,7 +636,6 @@ TxQueueCreate(
         context->fragmentRing = NetRingCollectionGetFragmentRing(rings);
         context->descCount = QueueDescriptorCount(context->fragmentRing->NumberOfElements);
         context->txPbl = deviceConfig.txPbl;
-        context->txChecksumOffload = deviceConfig.txCoeSel;
 
         TraceWrite("TxQueueCreate-size", LEVEL_VERBOSE,
             TraceLoggingHexInt32(context->packetRing->NumberOfElements, "packets"),
@@ -535,14 +674,17 @@ TxQueueCreate(
             NetExtensionTypePacket);
         NetTxQueueGetExtension(queue, &query, &context->packetIeee8021Q);
 
-        if (context->txChecksumOffload)
-        {
-            NET_EXTENSION_QUERY_INIT(&query,
-                NET_PACKET_EXTENSION_CHECKSUM_NAME,
-                NET_PACKET_EXTENSION_CHECKSUM_VERSION_1,
-                NetExtensionTypePacket);
-            NetTxQueueGetExtension(queue, &query, &context->packetChecksum);
-        }
+        NET_EXTENSION_QUERY_INIT(&query,
+            NET_PACKET_EXTENSION_GSO_NAME,
+            NET_PACKET_EXTENSION_GSO_VERSION_1,
+            NetExtensionTypePacket);
+        NetTxQueueGetExtension(queue, &query, &context->packetGso);
+
+        NET_EXTENSION_QUERY_INIT(&query,
+            NET_PACKET_EXTENSION_CHECKSUM_NAME,
+            NET_PACKET_EXTENSION_CHECKSUM_VERSION_1,
+            NetExtensionTypePacket);
+        NetTxQueueGetExtension(queue, &query, &context->packetChecksum);
 
         NET_EXTENSION_QUERY_INIT(&query,
             NET_FRAGMENT_EXTENSION_LOGICAL_ADDRESS_NAME,
