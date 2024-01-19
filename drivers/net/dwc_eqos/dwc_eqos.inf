@@ -84,6 +84,12 @@ HKR, Ndi\params\NetworkAddress,                  LimitText,      0, "12"
 HKR, Ndi\params\NetworkAddress,                  UpperCase,      0, "1"
 HKR, Ndi\params\NetworkAddress,                  Optional,       0, "1"
 
+HKR, Ndi\params\VlanID,                          ParamDesc,      0, %VlanID%
+HKR, Ndi\params\VlanID,                          type,           0, "int"
+HKR, Ndi\params\VlanID,                          default,        0, "0"
+HKR, Ndi\params\VlanID,                          min,            0, "0"
+HKR, Ndi\params\VlanID,                          max,            0, "4094"
+
 HKR, Ndi\params\*JumboPacket,                    ParamDesc,      0, %JumboPacket%
 HKR, Ndi\params\*JumboPacket,                    type,           0, "int"
 HKR, Ndi\params\*JumboPacket,                    default,        0, "1514"
@@ -203,6 +209,7 @@ RKCP                = "Rockchip"
 DWCEQOS.DeviceDesc  = "Synopsys DesignWare Ethernet Quality of Service (GMAC)"
 DWCEQOS.ServiceDesc = "DesignWare Ethernet"
 NetworkAddress      = "Network Address"
+VlanID              = "VLAN ID"
 JumboPacket         = "Jumbo Packet"
 FlowControl         = "Flow Control"
 PriorityVlanTag     = "Packet Priority & VLAN"
