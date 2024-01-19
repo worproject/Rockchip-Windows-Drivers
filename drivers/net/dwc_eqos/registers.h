@@ -676,6 +676,25 @@ union MacVlanTagCtrl_t
     };
 };
 
+union MacVlanIncl_t
+{
+    UINT32 Value32;
+    struct
+    {
+        UINT16 VlanTagTx; // VLT
+
+        UINT8 VlanControl : 2; // VLC
+        UINT8 VlanControlPriority : 1; // VLP
+        UINT8 VlanS : 1; // CSVL
+        UINT8 VlanInput : 1; // VLTI
+        UINT8 VLanChannelInsertion : 1;
+        UINT8 Reserved22 : 2;
+        UINT8 Addr : 6; // ADDR
+        UINT8 ReadWriteControl : 1; // RDWR
+        UINT8 Busy : 1; // BUSY
+    };
+};
+
 union MacInterruptStatus_t
 {
     UINT32 Value32;
@@ -995,7 +1014,7 @@ struct MacRegisters
     // The VLAN Tag Inclusion or Replacement register contains the VLAN tag for
     // insertion or replacement in the Transmit packets. It also contains the VLAN tag
     // insertion controls.
-    ULONG Mac_Vlan_Incl;
+    MacVlanIncl_t Mac_Vlan_Incl;
 
     // MAC_Inner_VLAN_Incl @ 0x0064 = 0x0:
     // The Inner VLAN Tag Inclusion or Replacement register contains the inner VLAN

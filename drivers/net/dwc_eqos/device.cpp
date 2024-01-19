@@ -675,6 +675,10 @@ DeviceD0Entry(
     vlanTagCtrl.RxStatusEnable = true;
     Write32(&context->regs->Mac_Vlan_Tag_Ctrl, vlanTagCtrl);
 
+    MacVlanIncl_t vlanIncl = {};
+    vlanIncl.VlanInput = true; // Get packet's VLAN tag from context descriptor.
+    Write32(&context->regs->Mac_Vlan_Incl, vlanIncl);
+
     MacWatchdogTimeout_t watchdogTimeout = {};
     // 0 = 2KB, 1 = 3KB, ... 14 = 16KB, 15 = Reserved.
     // jumboFrame value doesn't include VLAN or CRC, so add 8.
@@ -752,6 +756,7 @@ DevicePrepareHardware(
     bool configHasMacAddress = false;
     ULONG flowControlConfiguration;
     ULONG jumboPacketConfiguration;
+    ULONG vlanIdConfiguration;
 
     // Read configuration
 
@@ -808,6 +813,15 @@ DevicePrepareHardware(
             TraceWrite("QueryJumboPacket-not-found", LEVEL_VERBOSE,
                 TraceLoggingNTStatus(status));
             jumboPacketConfiguration = JumboPacketMin;
+        }
+
+        DECLARE_CONST_UNICODE_STRING(VlanID_Name, L"VlanID");
+        status = NetConfigurationQueryUlong(configuration, NET_CONFIGURATION_QUERY_ULONG_NO_FLAGS, &VlanID_Name, &vlanIdConfiguration);
+        if (!NT_SUCCESS(status))
+        {
+            TraceWrite("QueryVlanID-not-found", LEVEL_VERBOSE,
+                TraceLoggingNTStatus(status));
+            vlanIdConfiguration = 0;
         }
     }
 
@@ -1021,6 +1035,7 @@ DevicePrepareHardware(
             jumboPacketConfiguration < JumboPacketMin ? JumboPacketMin
             : jumboPacketConfiguration > JumboPacketMax ? JumboPacketMax
             : jumboPacketConfiguration);
+        context->config.vlanId = static_cast<UINT16>(vlanIdConfiguration <= 0xFFF ? vlanIdConfiguration : 0u);
 
         switch (flowControlConfiguration)
         {
@@ -1339,6 +1354,7 @@ DevicePrepareHardware(
         }
 
         Write32(&regs->Axi_Lpi_Entry_Interval, 15); // AutoAxiLpi after (interval + 1) * 64 clocks. Max value is 15.
+
         auto busMode = Read32(&regs->Dma_SysBus_Mode);
         busMode.EnableLpi = true;       // true = allow LPI, honor AXI LPI request.
         busMode.UnlockOnPacket = false; // false = Wake for any received packet, true = only wake for magic packet.
@@ -1348,7 +1364,6 @@ DevicePrepareHardware(
         busMode.AddressAlignedBeats = true; // Seemed to have fewer Rx FIFO overflows with this set to true.
         busMode.AutoAxiLpi = true;      // true = enter LPI after (Axi_Lpi_Entry_Interval + 1) * 64 idle clocks.
         busMode.BurstLengths = context->config.blen;
-
         busMode.FixedBurst = context->config.fixed_burst;
         Write32(&regs->Dma_SysBus_Mode, busMode);
 

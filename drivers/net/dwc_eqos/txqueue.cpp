@@ -23,6 +23,7 @@ struct TxQueueContext
     NET_EXTENSION packetChecksum;
     NET_EXTENSION fragmentLogical;
     UINT32 descCount;   // A power of 2 between QueueDescriptorMinCount and QueueDescriptorMaxCount.
+    UINT16 vlanId;
     UINT8 txPbl;
 
     UINT16 lastMss;     // MSS set by the most recent context descriptor.
@@ -65,8 +66,8 @@ TxQueueStart(_In_ NETPACKETQUEUE queue)
     // PASSIVE_LEVEL, nonpaged (resume path)
     auto const context = TxQueueGetContext(queue);
 
-    context->lastMss = 0; // Make no assumptions about the device's current MSS.
-    context->lastVlanTag = 0; // Make no assumptions about the device's current vlan tag.
+    context->lastMss = 0xFFFF; // Make no assumptions about the device's current MSS.
+    context->lastVlanTag = 0;  // Make no assumptions about the device's current vlan tag.
     context->descBegin = 0;
     context->descEnd = 0;
 
@@ -211,11 +212,17 @@ TxQueueAdvance(_In_ NETPACKETQUEUE queue)
             NT_ASSERT(fragmentCount != 0);
 
             auto const ieee8021Q = *NetExtensionGetPacketIeee8021Q(&context->packetIeee8021Q, pktIndex);
+            UINT16 const ieee8021QPriority = (ieee8021Q.TxTagging & NetPacketTxIeee8021qActionFlagPriorityRequired)
+                ? ieee8021Q.PriorityCodePoint : 0u;
+            UINT16 const ieee8021QVlan = (ieee8021Q.TxTagging & NetPacketTxIeee8021qActionFlagVlanRequired)
+                ? ieee8021Q.VlanIdentifier : context->vlanId;
+            UINT16 const vlanTag = (ieee8021QPriority << 13) | ieee8021QVlan;
+            auto const vlanTagControl = vlanTag != 0 ? TxVlanTagControlInsert : TxVlanTagControlNone;
+            auto const contextTagNeeded = vlanTag != 0 && vlanTag != context->lastVlanTag;
 
             auto const gso = NetExtensionGetPacketGso(&context->packetGso, pktIndex);
             NT_ASSERT(gso->TCP.Mss <= 0x3FFF); // 14 bits
             auto const gsoMss = static_cast<UINT16>(gso->TCP.Mss);
-            auto const vlanTagControl = ieee8021Q.TxTagging != 0 ? TxVlanTagControlInsert : TxVlanTagControlNone;
 
             if (gsoMss != 0) // segmentation offload enabled
             {
@@ -248,18 +255,6 @@ TxQueueAdvance(_In_ NETPACKETQUEUE queue)
                 NT_ASSERT(headerLength <= packetLength);
                 NT_ASSERT(userDescriptorsNeeded <= TxMaximumNumberOfFragments);
 
-                UINT16 newTag;
-                if (ieee8021Q.TxTagging != 0)
-                {
-                    newTag = (ieee8021Q.PriorityCodePoint << 13) | ieee8021Q.VlanIdentifier;
-                    NT_ASSERT(newTag != 0);
-                }
-                else
-                {
-                    newTag = context->lastVlanTag;
-                }
-
-                bool const contextTagNeeded = newTag != context->lastVlanTag;
                 bool const contextMssNeeded = gsoMss != context->lastMss;
                 bool const contextNeeded = contextTagNeeded || contextMssNeeded;
 
@@ -275,7 +270,7 @@ TxQueueAdvance(_In_ NETPACKETQUEUE queue)
                 {
                     TxDescriptorContext descCtx = {};
                     descCtx.MaximumSegmentSize = gsoMss;
-                    descCtx.VlanTag = newTag;
+                    descCtx.VlanTag = vlanTag;
                     descCtx.VlanTagValid = contextTagNeeded;
                     descCtx.OneStepInputOrMssValid = true;
                     descCtx.ContextType = true;
@@ -289,7 +284,10 @@ TxQueueAdvance(_In_ NETPACKETQUEUE queue)
                     context->descVirtual[descIndex].Context = descCtx;
                     descIndex = (descIndex + 1) & descMask;
                     context->lastMss = gsoMss;
-                    context->lastVlanTag = newTag;
+                    if (contextTagNeeded)
+                    {
+                        context->lastVlanTag = vlanTag;
+                    }
                 }
 
                 auto const frag0LogicalAddress = NetExtensionGetFragmentLogicalAddress(&context->fragmentLogical, fragIndex)->LogicalAddress;
@@ -365,25 +363,17 @@ TxQueueAdvance(_In_ NETPACKETQUEUE queue)
                     : checksum.Layer3 ? TxChecksumInsertionEnabledHeaderOnly
                     : TxChecksumInsertionDisabled;
 
-                if (ieee8021Q.TxTagging != 0)
+                // We might need a context descriptor.
+                if (fragmentCount + contextTagNeeded > EMPTY_DESC_REMAINING(descIndex))
                 {
-                    UINT16 const newTag = (ieee8021Q.PriorityCodePoint << 13) | ieee8021Q.VlanIdentifier;
-                    NT_ASSERT(newTag != 0);
-                    if (newTag == context->lastVlanTag)
-                    {
-                        goto NoContextPacket;
-                    }
+                    // Wait until more descriptors are free.
+                    break;
+                }
 
-                    // We will need a context descriptor.
-                    if (fragmentCount + 1u > EMPTY_DESC_REMAINING(descIndex))
-                    {
-                        // Wait until more descriptors are free.
-                        break;
-                    }
-
+                if (contextTagNeeded)
+                {
                     TxDescriptorContext descCtx = {};
-                    descCtx.MaximumSegmentSize = context->lastMss;
-                    descCtx.VlanTag = newTag;
+                    descCtx.VlanTag = vlanTag;
                     descCtx.VlanTagValid = true;
                     descCtx.ContextType = true;
                     descCtx.Own = true;
@@ -395,17 +385,8 @@ TxQueueAdvance(_In_ NETPACKETQUEUE queue)
                     NT_ASSERT(EMPTY_DESC_REMAINING(descIndex) != 0);
                     context->descVirtual[descIndex].Context = descCtx;
                     descIndex = (descIndex + 1) & descMask;
-                    context->lastVlanTag = newTag;
-                }
-                else
-                {
-                NoContextPacket:
-
-                    if (fragmentCount > EMPTY_DESC_REMAINING(descIndex))
-                    {
-                        // Wait until more descriptors are free.
-                        break;
-                    }
+                    TraceWrite("TxTag", LEVEL_INFO, TraceLoggingHexInt16(vlanTag));
+                    context->lastVlanTag = vlanTag;
                 }
 
                 UINT32 frameLength = 0;
@@ -635,6 +616,7 @@ TxQueueCreate(
         context->packetRing = NetRingCollectionGetPacketRing(rings);
         context->fragmentRing = NetRingCollectionGetFragmentRing(rings);
         context->descCount = QueueDescriptorCount(context->fragmentRing->NumberOfElements);
+        context->vlanId = deviceConfig.vlanId;
         context->txPbl = deviceConfig.txPbl;
 
         TraceWrite("TxQueueCreate-size", LEVEL_VERBOSE,
