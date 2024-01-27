@@ -36,7 +36,9 @@ jobs:
     - name: Bundle symbols
       run: |
         Get-ChildItem -Path $env:DRIVER_OUTPUT_DIR -Directory | ForEach-Object {
-            Copy-Item -Path "$env:DRIVER_OUTPUT_DIR\$($_.Name).pdb" -Destination $_.FullName
+            if (Test-Path -Path "$env:DRIVER_OUTPUT_DIR\$($_.Name).pdb") {
+                Copy-Item -Path "$env:DRIVER_OUTPUT_DIR\$($_.Name).pdb" -Destination $_.FullName
+            }
         }
       
     - name: Get version tag
