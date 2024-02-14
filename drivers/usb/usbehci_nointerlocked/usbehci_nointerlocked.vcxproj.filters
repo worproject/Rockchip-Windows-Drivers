@@ -19,7 +19,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <Inf Include="usbehci_noncoherent.inf">
+    <Inf Include="usbehci_nointerlocked.inf">
       <Filter>Driver Files</Filter>
     </Inf>
   </ItemGroup>

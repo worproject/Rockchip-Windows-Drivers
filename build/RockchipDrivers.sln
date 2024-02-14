@@ -29,7 +29,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "csaudio-Utilities", "..\dri
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "dwc_eqos", "..\drivers\net\dwc_eqos\dwc_eqos.vcxproj", "{CAD465B6-97D7-402D-85F8-50DE140A6D9D}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "usbehci_noncoherent", "..\drivers\usb\usbehci_noncoherent\usbehci_noncoherent.vcxproj", "{BB0C35DD-3009-4CA5-86C8-B255D378A84B}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "usbehci_nointerlocked", "..\drivers\usb\usbehci_nointerlocked\usbehci_nointerlocked.vcxproj", "{BB0C35DD-3009-4CA5-86C8-B255D378A84B}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
