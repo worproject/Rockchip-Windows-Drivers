@@ -11,7 +11,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <Inf Include="usbehci_noncoherent.inf" />
+    <Inf Include="usbehci_nointerlocked.inf" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{BB0C35DD-3009-4CA5-86C8-B255D378A84B}</ProjectGuid>
@@ -20,7 +20,7 @@
     <MinimumVisualStudioVersion>12.0</MinimumVisualStudioVersion>
     <Configuration>Debug</Configuration>
     <Platform Condition="'$(Platform)' == ''">Win32</Platform>
-    <RootNamespace>usbehci_noncoherent</RootNamespace>
+    <RootNamespace>usbehci_nointerlocked</RootNamespace>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'" Label="Configuration">

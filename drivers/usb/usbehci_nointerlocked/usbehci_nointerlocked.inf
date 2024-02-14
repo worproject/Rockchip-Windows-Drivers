@@ -7,7 +7,7 @@ Class       = USB
 ClassGuid   = {36fc9e60-c465-11cf-8056-444553540000}
 Provider    = %Provider%
 DriverVer   = ; provided by stampinf
-CatalogFile = usbehci_noncoherent.cat
+CatalogFile = usbehci_nointerlocked.cat
 PnpLockdown = 1
 
 [ControlFlags]
