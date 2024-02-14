@@ -13,15 +13,77 @@ PnpLockdown = 1
 [ControlFlags]
 ExcludeFromSelect = *
 
+[SourceDisksNames]
+1 = Disk
+
+[SourceDisksFiles]
+usbehci_nointerlocked.sys = 1
+
+[DestinationDirs]
+DefaultDestDir = 12
+
 [Manufacturer]
-%Provider% = Generic.Section,NTarm64.10.0...26038
+%Provider% = Generic.Section, NTarm64.10.0...19041, NTarm64.10.0...26038
+
+[Generic.Section.NTarm64.10.0...19041]
+%EhciPci.DeviceDesc%  = EHCI.Dev.Backport,     PCI\CC_0C0320
+%EhciSoc.DeviceDesc%  = EHCI_SOC.Dev.Backport, *PNP0D20
+%EhciSoc.DeviceDesc%  = EHCI_SOC.Dev.Backport, *PNP0FFC
+%EhciSoc.DeviceDesc%  = EHCI_SOC.Dev.Backport, ACPI\PNP0D20
+%RKCP0D20.DeviceDesc% = EHCI_SOC.Dev.Backport, ACPI\RKCP0D20
 
 [Generic.Section.NTarm64.10.0...26038]
-%EhciPci.DeviceDesc% = EHCI.Dev,     PCI\CC_0C0320
-%EhciSoc.DeviceDesc% = EHCI_SOC.Dev, *PNP0D20
-%EhciSoc.DeviceDesc% = EHCI_SOC.Dev, *PNP0FFC
-%EhciSoc.DeviceDesc% = EHCI_SOC.Dev, ACPI\PNP0D20
-%EhciSoc.DeviceDesc% = EHCI_SOC.Dev, ACPI\RKCP0D20
+%EhciPci.DeviceDesc%  = EHCI.Dev,     PCI\CC_0C0320
+%EhciSoc.DeviceDesc%  = EHCI_SOC.Dev, *PNP0D20
+%EhciSoc.DeviceDesc%  = EHCI_SOC.Dev, *PNP0FFC
+%EhciSoc.DeviceDesc%  = EHCI_SOC.Dev, ACPI\PNP0D20
+%RKCP0D20.DeviceDesc% = EHCI_SOC.Dev, ACPI\RKCP0D20
+
+[EHCI.Dev.Backport.NT]
+FeatureScore = 1
+Include      = usbport.inf
+Needs        = EHCI.Dev.NT
+CopyFiles    = EHCI.Backport.Copy
+
+[EHCI.Dev.Backport.NT.Services]
+AddService = usbehci, 0x00000002, EHCI.Backport.AddService, EHCI.Backport.AddEventLog
+
+[EHCI.Dev.Backport.NT.HW]
+AddReg  = NoInterlockedOp_AddReg
+
+[EHCI_SOC.Dev.Backport.NT]
+FeatureScore = 1
+Include      = usbport.inf
+Needs        = EHCI_SOC.Dev.NT
+CopyFiles    = EHCI.Backport.Copy
+
+[EHCI_SOC.Dev.Backport.NT.Services]
+AddService = usbehci, 0x00000002, EHCI.Backport.AddService, EHCI.Backport.AddEventLog
+
+[EHCI_SOC.Dev.Backport.NT.HW]
+AddReg = NoInterlockedOp_AddReg
+
+[EHCI.Backport.AddService]
+DisplayName    = %EHCIMP.SvcDesc%
+ServiceType    = 1                  ; SERVICE_KERNEL_DRIVER
+StartType      = 3                  ; SERVICE_DEMAND_START
+ErrorControl   = 1                  ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %12%\usbehci_nointerlocked.sys
+LoadOrderGroup = Base
+AddReg         = EHCI.Backport.AddService.AddReg
+
+[EHCI.Backport.AddEventLog]
+AddReg = EHCI.Backport.AddEventLog.AddReg
+
+[EHCI.Backport.AddEventLog.AddReg]
+HKR,, EventMessageFile, 0x00020000, "%%SystemRoot%%\System32\IoLogMsg.dll;%%SystemRoot%%\System32\Drivers\usbehci_nointerlocked.sys"
+HKR,, TypesSupported, 0x00010001, 7
+
+[EHCI.Backport.AddService.AddReg]
+HKR,, BootFlags, 0x00010003, 0x4 ; CM_SERVICE_USB_DISK_BOOT_LOAD
+
+[EHCI.Backport.Copy]
+usbehci_nointerlocked.sys
 
 [EHCI.Dev.NT]
 FeatureScore = 1
@@ -51,6 +113,8 @@ AddReg = NoInterlockedOp_AddReg
 HKR,, NoInterlockedOpOnCommonBuffers, 0x10001, 0x00000001
 
 [Strings]
-Provider           = "Open Source"
-EhciPci.DeviceDesc = "Standard Enhanced PCI to USB Host Controller (NCC)"
-EhciSoc.DeviceDesc = "Standard EHCI-compliant Host Controller (NCC)"
+Provider            = "Open Source"
+EHCIMP.SvcDesc      = "Microsoft USB 2.0 Enhanced Host Controller Miniport Driver (NoInterlocked)"
+EhciPci.DeviceDesc  = "Standard Enhanced PCI to USB Host Controller (NoInterlocked)"
+EhciSoc.DeviceDesc  = "Standard EHCI-compliant Host Controller (NoInterlocked)"
+RKCP0D20.DeviceDesc = "Rockchip USB 2.0 Enhanced Host Controller"
