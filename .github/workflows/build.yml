@@ -47,7 +47,7 @@ jobs:
         $version = git describe --tags --always
         Write-Output "version=$($version)" >> $env:GITHUB_OUTPUT
         
-    - name: Upload unsigned driver package artifact
+    - name: Upload testsigned driver package artifact
       uses: actions/upload-artifact@v3
       with:
         name: RkDrvPkg_${{matrix.PLATFORM}}_${{matrix.CONFIGURATION}}_${{steps.get_version_tag.outputs.version}}_testsigned
