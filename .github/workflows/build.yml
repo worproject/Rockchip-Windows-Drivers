@@ -50,5 +50,5 @@ jobs:
     - name: Upload unsigned driver package artifact
       uses: actions/upload-artifact@v3
       with:
-        name: RkDrvPkg_${{matrix.PLATFORM}}_${{matrix.CONFIGURATION}}_${{steps.get_version_tag.outputs.version}}_unsigned
+        name: RkDrvPkg_${{matrix.PLATFORM}}_${{matrix.CONFIGURATION}}_${{steps.get_version_tag.outputs.version}}_testsigned
         path: ${{env.DRIVER_OUTPUT_DIR}}/*/
