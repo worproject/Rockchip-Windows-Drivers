@@ -6,8 +6,8 @@ This repository contains drivers for RK35xx-based platforms, with a focus on RK3
 | --- | --- | --- | --- |
 |USB 3 ports 0/1 Host|usbxhci (Inbox)|🟢 Working|The "full" USB3 port(s) work correctly, except USB3 only works in one orientation when used with a Type-C connector.<br> Note that RK3588s devices (e.g. Opi5, Opi5B) have only 1 "full" USB3 port -- only RK3588 devices (e.g. Opi5+) have 2 "full" USB3 ports.|
 |USB 3 ports 0/1 Dual Role|usbxhci (Inbox)|🔴 Not working|Host mode only, no dual role capability. Depends on USB/DP Alt Mode switching.|
-|USB 3 port 2 Host|usbxhci (Inbox)|🟡 Partially working|USB3 only, won't support USB2 or USB1 devices even if you use a hub.<br> USB3 port 2 works by combining a USB3-only xHCI port with a USB2 EHCI+OHCI port. Since EHCI+OHCI aren't working (issue #4), this port will work for USB3 devices but not for USB2 or USB1 devices.|
-|USB 2.0 & 1.1|usbehci (Inbox)|🔴 Not working|Disabled by default in UEFI.<br> Windows bugchecks if EHCI device enabled (issue #4).<br> USBOHCI driver for USB 1.1 is missing in ARM64 builds (issue #5).|
+|USB 3 port 2 Host|usbxhci (Inbox)|🟡 Partially working|Won't support USB1 devices without a hub.<br> USB3 port 2 works by combining a USB3-only xHCI port with a USB2 EHCI+OHCI port. Since OHCI isn't working (issue #5), this port will not work for USB1 devices.|
+|USB 2.0 & 1.1|usbehci (Inbox)|🟡 Partially working|USBOHCI driver for USB 1.1 is missing in ARM64 builds (issue #5).|
 |PCIe 3.0 & 2.1|pci (Inbox)|🟡 Partially working|Devices may work if drivers are available for them. Known issues include:<br> - NVMe SSDs do not work with in-box storport.sys (issue #6, workaround available).<br> - Devices that require cache-coherent bus or MSI do not work (e.g. Qualcomm Wi-Fi cards).<br> - Devices that require a root PCIe port do not work (e.g. XHCI).|
 |SATA|storahci (Inbox)|🔴 Not working|SATA SSDs do not work with in-box storport.sys (issue #6, workaround available).|
 |eMMC|[dwcsdhc](https://github.com/worproject/Rockchip-Windows-Drivers/tree/master/drivers/sd/dwcsdhc)|🟢 Working||
