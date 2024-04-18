@@ -28,7 +28,7 @@ PETrust=true
 %CAAUDIORK3X_SA.DeviceDesc%=CAAUDIORK3X_SA, CSAUDIO\RK&CLTR
 
 [DestinationDirs]
-CAAUDIORK3X_SA.CopyList=13 ; 13=Package's DriverStore directory
+CAAUDIORK3X_SA.CopyList=12
 
 ;======================================================
 ; CAAUDIORK3X_SA
