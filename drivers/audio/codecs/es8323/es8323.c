@@ -193,110 +193,293 @@ NTSTATUS BOOTCODEC(
 
 	//Reset
 
-	es8323_reg_write(pDevice, ES8323_CONTROL1, 0x80);
-	es8323_reg_write(pDevice, ES8323_CONTROL1, 0x00);
+	status = es8323_reg_write(pDevice, ES8323_CONTROL1, 0x80);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	status = es8323_reg_write(pDevice, ES8323_CONTROL1, 0x00);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
 
 	//Enable
 
-	es8323_reg_write(pDevice, 0x01, 0x60);
-	es8323_reg_write(pDevice, 0x02, 0xF3);
-	es8323_reg_write(pDevice, 0x02, 0xF0);
-	es8323_reg_write(pDevice, 0x2B, 0x80);
-	es8323_reg_write(pDevice, 0x00, 0x36);
-	es8323_reg_write(pDevice, 0x08, 0x00);
-	es8323_reg_write(pDevice, 0x04, 0x00);
-	es8323_reg_write(pDevice, 0x06, 0xC3);
-	es8323_reg_write(pDevice, 0x19, 0x02);
-	es8323_reg_write(pDevice, 0x09, 0x00);
-	es8323_reg_write(pDevice, 0x0A, 0x00);
-	es8323_reg_write(pDevice, 0x0B, 0x02);
-	es8323_reg_write(pDevice, 0x0C, 0x4C);
-	es8323_reg_write(pDevice, 0x0D, 0x02);
-	es8323_reg_write(pDevice, 0x10, 0x00);
-	es8323_reg_write(pDevice, 0x11, 0x00);
-	es8323_reg_write(pDevice, 0x12, 0xea);
-	es8323_reg_write(pDevice, 0x13, 0xc0);
-	es8323_reg_write(pDevice, 0x14, 0x05);
-	es8323_reg_write(pDevice, 0x15, 0x06);
-	es8323_reg_write(pDevice, 0x16, 0x53);
+	status = es8323_reg_write(pDevice, 0x01, 0x60);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	status = es8323_reg_write(pDevice, 0x02, 0xF3);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	status = es8323_reg_write(pDevice, 0x02, 0xF0);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	status = es8323_reg_write(pDevice, 0x2B, 0x80);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	status = es8323_reg_write(pDevice, 0x00, 0x36);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	status = es8323_reg_write(pDevice, 0x08, 0x00);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	status = es8323_reg_write(pDevice, 0x04, 0x00);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	status = es8323_reg_write(pDevice, 0x06, 0xC3);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	status = es8323_reg_write(pDevice, 0x19, 0x02);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	status = es8323_reg_write(pDevice, 0x09, 0x00);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	status = es8323_reg_write(pDevice, 0x0A, 0x00);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	status = es8323_reg_write(pDevice, 0x0B, 0x02);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	status = es8323_reg_write(pDevice, 0x0C, 0x4C);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	status = es8323_reg_write(pDevice, 0x0D, 0x02);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	status = es8323_reg_write(pDevice, 0x10, 0x00);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	status = es8323_reg_write(pDevice, 0x11, 0x00);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	status = es8323_reg_write(pDevice, 0x12, 0xea);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	status = es8323_reg_write(pDevice, 0x13, 0xc0);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	status = es8323_reg_write(pDevice, 0x14, 0x05);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	status = es8323_reg_write(pDevice, 0x15, 0x06);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	status = es8323_reg_write(pDevice, 0x16, 0x53);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
 
-	es8323_reg_write(pDevice, 0x17, 0x18);
-	es8323_reg_write(pDevice, 0x18, 0x02);
-	es8323_reg_write(pDevice, 0x1A, 0x00);
-	es8323_reg_write(pDevice, 0x1B, 0x00);
-	es8323_reg_write(pDevice, 0x27, 0xB8);
-	es8323_reg_write(pDevice, 0x2A, 0xB8);
-	es8323_reg_write(pDevice, 0x35, 0xA0);
+	status = es8323_reg_write(pDevice, 0x17, 0x18);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	status = es8323_reg_write(pDevice, 0x18, 0x02);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	status = es8323_reg_write(pDevice, 0x1A, 0x00);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	status = es8323_reg_write(pDevice, 0x1B, 0x00);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	status = es8323_reg_write(pDevice, 0x27, 0xB8);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	status = es8323_reg_write(pDevice, 0x2A, 0xB8);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	status = es8323_reg_write(pDevice, 0x35, 0xA0);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
 
 	udelay(18000);
 
-	es8323_reg_write(pDevice, 0x2E, 0x1E);
-	es8323_reg_write(pDevice, 0x2F, 0x1E);
-	es8323_reg_write(pDevice, 0x30, 0x1E);
-	es8323_reg_write(pDevice, 0x31, 0x1E);
-	es8323_reg_write(pDevice, 0x03, 0x09);
-	es8323_reg_write(pDevice, 0x02, 0x00);
+	status = es8323_reg_write(pDevice, 0x2E, 0x1E);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	status = es8323_reg_write(pDevice, 0x2F, 0x1E);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	status = es8323_reg_write(pDevice, 0x30, 0x1E);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	status = es8323_reg_write(pDevice, 0x31, 0x1E);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	status = es8323_reg_write(pDevice, 0x03, 0x09);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	status = es8323_reg_write(pDevice, 0x02, 0x00);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
 
 	udelay(18000);
 
-	es8323_reg_write(pDevice, 0x04, 0x3C);
+	status = es8323_reg_write(pDevice, 0x04, 0x3C);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
 
 	//standby / prepare bias
 
-	es8323_reg_write(pDevice, ES8323_ANAVOLMANAG, 0x7C);
-	es8323_reg_write(pDevice, ES8323_CHIPLOPOW1, 0x00);
-	es8323_reg_write(pDevice, ES8323_CHIPLOPOW2, 0x00);
-	es8323_reg_write(pDevice, ES8323_CHIPPOWER, 0x00);
-	es8323_reg_write(pDevice, ES8323_ADCPOWER, 0x59);
+	status = es8323_reg_write(pDevice, ES8323_ANAVOLMANAG, 0x7C);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	status = es8323_reg_write(pDevice, ES8323_CHIPLOPOW1, 0x00);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	status = es8323_reg_write(pDevice, ES8323_CHIPLOPOW2, 0x00);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	status = es8323_reg_write(pDevice, ES8323_CHIPPOWER, 0x00);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	status = es8323_reg_write(pDevice, ES8323_ADCPOWER, 0x59);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
 
 	//Hw Params
 
 	{
 		UINT32 coeff = 0x17;
 		UINT8 val;
-		es8323_reg_read(pDevice, ES8323_IFACE, &val);
+		status = es8323_reg_read(pDevice, ES8323_IFACE, &val);
+		if (!NT_SUCCESS(status)) {
+			return status;
+		}
 		UINT16 srate = val & 0x80;
-		es8323_reg_read(pDevice, ES8323_ADC_IFACE, &val);
+		status = es8323_reg_read(pDevice, ES8323_ADC_IFACE, &val);
+		if (!NT_SUCCESS(status)) {
+			return status;
+		}
 		UINT16 adciface = val & 0xE3;
-		es8323_reg_read(pDevice, ES8323_DAC_IFACE, &val);
+		status = es8323_reg_read(pDevice, ES8323_DAC_IFACE, &val);
+		if (!NT_SUCCESS(status)) {
+			return status;
+		}
 		UINT16 daciface = val & 0xC7;
 
 		//16-bit
 		adciface |= 0x000C;
 		daciface |= 0x0018;
 
-		es8323_reg_write(pDevice, ES8323_DAC_IFACE, daciface & 0xff);
-		es8323_reg_write(pDevice, ES8323_ADC_IFACE, adciface & 0xff);
+		status = es8323_reg_write(pDevice, ES8323_DAC_IFACE, daciface & 0xff);
+		if (!NT_SUCCESS(status)) {
+			return status;
+		}
+		status = es8323_reg_write(pDevice, ES8323_ADC_IFACE, adciface & 0xff);
+		if (!NT_SUCCESS(status)) {
+			return status;
+		}
 
 		//coeff
-		es8323_reg_write(pDevice, ES8323_IFACE, srate & 0xff);
-		es8323_reg_write(pDevice, ES8323_ADCCONTROL5,
+		status = es8323_reg_write(pDevice, ES8323_IFACE, srate & 0xff);
+		if (!NT_SUCCESS(status)) {
+			return status;
+		}
+		status = es8323_reg_write(pDevice, ES8323_ADCCONTROL5,
 			coeff_div[coeff].sr |
 			coeff_div[coeff].usb << 4);
-		es8323_reg_write(pDevice, ES8323_DACCONTROL2,
+		if (!NT_SUCCESS(status)) {
+			return status;
+		}
+		status = es8323_reg_write(pDevice, ES8323_DACCONTROL2,
 			coeff_div[coeff].sr |
 			coeff_div[coeff].usb << 4);
+		if (!NT_SUCCESS(status)) {
+			return status;
+		}
 	}
 
 
-	es8323_reg_write(pDevice, ES8323_ADCPOWER, 0x09);
+	status = es8323_reg_write(pDevice, ES8323_ADCPOWER, 0x09);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
 
 	//Set ALC Capture
-	es8323_reg_write(pDevice, ES8323_ADCCONTROL10, 0xfa); //max / min pga
-	es8323_reg_write(pDevice, ES8323_ADCCONTROL11, 0xf0); //target volume / hold time
-	es8323_reg_write(pDevice, ES8323_ADCCONTROL12, 0x05); //decay / attack time
-	es8323_reg_write(pDevice, ES8323_ADCCONTROL14, 0x4b); //threshold / ng switch
+	status = es8323_reg_write(pDevice, ES8323_ADCCONTROL10, 0xfa); //max / min pga
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	status = es8323_reg_write(pDevice, ES8323_ADCCONTROL11, 0xf0); //target volume / hold time
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	status = es8323_reg_write(pDevice, ES8323_ADCCONTROL12, 0x05); //decay / attack time
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	status = es8323_reg_write(pDevice, ES8323_ADCCONTROL14, 0x4b); //threshold / ng switch
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
 
-	es8323_reg_write(pDevice, ES8323_DACCONTROL7, 0x02); //dac stereo 3d
+	status = es8323_reg_write(pDevice, ES8323_DACCONTROL7, 0x02); //dac stereo 3d
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
 
 	//Output playback
-	es8323_reg_write(pDevice, ES8323_DACCONTROL16, 0x02); //maybe not needed?
+	status = es8323_reg_write(pDevice, ES8323_DACCONTROL16, 0x02); //maybe not needed?
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
 
-	es8323_reg_write(pDevice, ES8323_DACCONTROL24, 0x21); //output 1 volume
-	es8323_reg_write(pDevice, ES8323_DACCONTROL25, 0x21); //output 1 volume
+	status = es8323_reg_write(pDevice, ES8323_DACCONTROL24, 0x21); //output 1 volume
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	status = es8323_reg_write(pDevice, ES8323_DACCONTROL25, 0x21); //output 1 volume
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
 
-	es8323_reg_write(pDevice, ES8323_DACCONTROL26, 0x21); //output 2 volume
-	es8323_reg_write(pDevice, ES8323_DACCONTROL27, 0x21); //output 2 volume
+	status = es8323_reg_write(pDevice, ES8323_DACCONTROL26, 0x21); //output 2 volume
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+	status = es8323_reg_write(pDevice, ES8323_DACCONTROL27, 0x21); //output 2 volume
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
 
 	return status;
 }
