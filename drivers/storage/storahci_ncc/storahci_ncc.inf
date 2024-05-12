@@ -1,0 +1,241 @@
+; Replace in-box storahci.sys with patched version that
+; handles non-coherent cache.
+
+[Version]
+Signature="$WINDOWS NT$"
+Class=hdc
+ClassGuid={4D36E96A-E325-11CE-BFC1-08002BE10318}
+Provider=%Provider%
+DriverVer= ; provided by stampinf
+CatalogFile=storahci_ncc.cat
+PnpLockdown=1
+
+[ControlFlags]
+ExcludeFromSelect=*
+
+[SourceDisksNames]
+1 = Disk
+
+[SourceDisksFiles]
+storahci_ncc.sys = 1
+
+[DestinationDirs]
+storahci_copyfiles = 12
+
+[Manufacturer]
+%NCC-AHCI%=AHCI_HDC, NTarm64.10.0...22621
+
+[AHCI_HDC.NTarm64.10.0...22621]
+%PCI\CC_010601.DeviceDesc%=storahci_Inst, PCI\CC_010601; Standard SATA AHCI Controller
+%ACPI\CLS_0001&SUBCLS_0006&PI_01.DeviceDesc% = storahci_Inst, ACPI\CLS_0001&SUBCLS_0006&PI_01
+
+[storahci_copyfiles]
+storahci_ncc.sys,,,0x100
+
+[storahci_Inst]
+CopyFiles = storahci_copyfiles
+AddPowerSetting=AhciPowerSetting1,AhciPowerSetting2
+
+; Exclude Toshiba RAID controllers
+ExcludeId = PCI\VEN_8086&DEV_2653&SUBSYS_0F001179
+ExcludeId = PCI\VEN_8086&DEV_2653&SUBSYS_0F101179
+ExcludeId = PCI\VEN_8086&DEV_27C5&SUBSYS_0F001179
+ExcludeId = PCI\VEN_8086&DEV_27C5&SUBSYS_0F101179
+ExcludeId = PCI\VEN_8086&DEV_27C5&SUBSYS_0F031179
+ExcludeId = PCI\VEN_8086&DEV_27C5&SUBSYS_0F131179
+ExcludeId = PCI\VEN_8086&DEV_27C5&SUBSYS_FF011179
+ExcludeId = PCI\VEN_8086&DEV_2829&SUBSYS_0F031179
+ExcludeId = PCI\VEN_8086&DEV_2829&SUBSYS_0F131179
+ExcludeId = PCI\VEN_8086&DEV_2829&SUBSYS_FF011179
+ExcludeId = PCI\VEN_8086&DEV_2829&SUBSYS_FF021179
+ExcludeId = PCI\VEN_8086&DEV_2829&SUBSYS_FF031179
+ExcludeId = PCI\VEN_8086&DEV_2829&SUBSYS_FF041179
+ExcludeId = PCI\VEN_8086&DEV_2829&SUBSYS_FF111179
+ExcludeId = PCI\VEN_8086&DEV_2829&SUBSYS_FF121179
+ExcludeId = PCI\VEN_8086&DEV_2829&SUBSYS_FF131179
+ExcludeId = PCI\VEN_8086&DEV_2829&SUBSYS_FF141179
+ExcludeId = PCI\VEN_8086&DEV_2829&SUBSYS_FF311179
+ExcludeId = PCI\VEN_8086&DEV_2829&SUBSYS_FF321179
+ExcludeId = PCI\VEN_8086&DEV_2829&SUBSYS_FF331179
+ExcludeId = PCI\VEN_8086&DEV_2829&SUBSYS_FF341179
+
+[AhciPowerSetting1]
+Subgroup = {0012ee47-9041-4b5d-9b77-535fba8b1442}
+; LPM: Partial - 10us resume time on IO; Slumber - 10ms resume time on IO
+
+;****** HIPM settings 
+Setting =  {0b2d69d7-a2a1-449c-9680-f91c70521c60}, "AHCI Link Power Management - HIPM/DIPM", "Configures the LPM state.",,0x00000001
+
+Value = 0, "Active", "Neither Host or Device initiated allowed", 0x00010001, 0
+Value = 1, "HIPM", "Host initiated allowed only", 0x00010001, 1
+Value = 2, "HIPM+DIPM", "Both Host and Device initiated allowed", 0x00010001, 3 
+Value = 3, "DIPM", "Device initiated allowed only", 0x00010001, 2
+
+; High Performance
+Default = {8C5E7FDA-E8BF-4A96-9A85-A6E23A8C635C}, 0, 0
+Default = {8C5E7FDA-E8BF-4A96-9A85-A6E23A8C635C}, 1, 1
+; Balanced
+Default = {381B4222-F694-41F0-9685-FF5BB260DF2E}, 0, 1
+Default = {381B4222-F694-41F0-9685-FF5BB260DF2E}, 1, 1
+; Power Saving
+Default = {A1841308-3541-4FAB-BC81-F71556F20B4A}, 0, 2
+Default = {A1841308-3541-4FAB-BC81-F71556F20B4A}, 1, 2
+
+[AhciPowerSetting2]
+Subgroup = {0012ee47-9041-4b5d-9b77-535fba8b1442}
+; LPM: Partial - 10us resume time on IO; Slumber - 10ms resume time on IO
+
+;****** Partial to Slumber settings (ms)
+Setting =  {DAB60367-53FE-4fbc-825E-521D069D2456}, "AHCI Link Power Management - Adaptive", "Automatically transit from Partial to Slumber.",,0x00000001
+; range 0 to 5 minutes (unit: ms)
+ValueRange = 0, 300000, 1, "millisecond"
+
+; High Performance
+Default = {8C5E7FDA-E8BF-4A96-9A85-A6E23A8C635C}, 0, 0
+Default = {8C5E7FDA-E8BF-4A96-9A85-A6E23A8C635C}, 1, 0
+; Balanced
+Default = {381B4222-F694-41F0-9685-FF5BB260DF2E}, 0, 100
+Default = {381B4222-F694-41F0-9685-FF5BB260DF2E}, 1, 100
+; Power Saving
+Default = {A1841308-3541-4FAB-BC81-F71556F20B4A}, 0, 100
+Default = {A1841308-3541-4FAB-BC81-F71556F20B4A}, 1, 100
+
+[storahci_Inst.HW]
+AddReg=storahci_Inst_HW_AddReg
+
+[storahci_Inst_HW_AddReg]
+; registry values related to MSI support
+HKR, Interrupt Management, 0x00000010
+HKR, Interrupt Management\MessageSignaledInterruptProperties, 0x00000010
+HKR, Interrupt Management\Affinity Policy, 0x00000010
+
+;
+; The MSISupported entry determines whether the device supports MSIs. Set it to 1 to enable MSI support.
+;
+HKR, Interrupt Management\MessageSignaledInterruptProperties, MSISupported,       %REG_DWORD%,   1
+
+;
+; The MessageNumberLimit entry specifies the maximum number of MSIs to allocate. 
+; For PCI 2.2, MessageNumberLimit must be 1, 2, 4, 8, or 16. For PCI 3.0, MessageNumberLimit can be any number up to 2,048.
+; Set it to 8 as it covers most of AHCI controller's needs that implement less than 8 ports.
+;
+HKR, Interrupt Management\MessageSignaledInterruptProperties, MessageNumberLimit, %REG_DWORD%,   8
+
+;
+; Make sure all processor in group are used to serve interrupt from this device. IrqPolicySpreadMessagesAcrossAllProcessors (5)
+;
+HKR, Interrupt Management\Affinity Policy, DevicePolicy,   %REG_DWORD%, 5
+
+;
+; Specifies that the device's interrupts are of high priority. This setting is appropriate for devices that require low latency. IrqPriorityHigh (3)
+;
+HKR, Interrupt Management\Affinity Policy, DevicePriority, %REG_DWORD%, 3
+
+;
+; Allow interrupt happens on processors beyond group 0. (e.g. might be in a single group other than 0)
+;
+HKR, Interrupt Management\Affinity Policy, GroupPolicy, %REG_DWORD%, 1
+
+; Enables Storport IPM for this adapter
+HKR, "StorPort", "EnableIdlePowerManagement", %REG_DWORD%, 0x01
+
+;
+; Opt into DMA remapping, but only for external hot-plug devices
+;
+HKR, DMA Management, RemappingSupported, %REG_DWORD%, 1
+HKR, DMA Management, RemappingFlags, %REG_DWORD%, 0x1
+
+[storahci_Inst.Services]
+AddService = storahci, %SPSVCINST_ASSOCSERVICE%, storahci_Service_Inst_Client, storahci_EventLog_Inst
+
+[storahci_Service_Inst_Client]
+DisplayName    = %storahci_ServiceDescription%
+ServiceType    = %SERVICE_KERNEL_DRIVER%
+StartType      = %SERVICE_BOOT_START%
+ErrorControl   = %SERVICE_ERROR_CRITICAL%
+ServiceBinary  = %12%\storahci_ncc.sys
+LoadOrderGroup = SCSI Miniport
+AddReg         = storahci_general_values
+AddReg         = device_specific_values
+AddReg         = client_sku_values
+
+[storahci_general_values]
+HKLM, "SYSTEM\CurrentControlSet\Control\Compatibility\Driver\storahci_ncc.sys", "Shims", %REG_MULTI_SZ_APPEND%, "Srbshim"
+
+HKR, "Parameters\PnpInterface", "5", %REG_DWORD%, 0x00000001
+HKR, "Parameters", "BusType", %REG_DWORD%, 0x0000000B
+HKR, "Parameters", "IoTimeoutValue", %REG_DWORD%, 0x0000001E
+HKR, "Parameters", "BusyRetryCount", %REG_DWORD%, 0x000000F0
+HKR, "Parameters", "BusyPauseTimeInMs", %REG_DWORD%, 0x000001F4
+
+[device_specific_values]
+HKR, "Parameters\Device", "ResetInInit", %REG_MULTI_SZ_APPEND%, "VEN_1106&DEV_6287&REV_*"
+
+HKR, "Parameters\Device", "SingleIO", %REG_MULTI_SZ_APPEND%, "VEN_1106&DEV_6287&REV_00"
+HKR, "Parameters\Device", "SingleIO", %REG_MULTI_SZ_APPEND%, "VEN_1106&DEV_6287&REV_10"
+HKR, "Parameters\Device", "SingleIO", %REG_MULTI_SZ_APPEND%, "VEN_1106&DEV_6287&REV_20"
+
+HKR, "Parameters\Device", "IgnoreHotPlug", %REG_MULTI_SZ_APPEND%, "VEN_1002&DEV_4380&REV_*"
+
+HKR, "Parameters\Device", "NeverNonQueuedErrorRecovery", %REG_MULTI_SZ_APPEND%, "VEN_1002&DEV_4380&REV_*"
+
+HKR, "Parameters\Device", "EnableCLOReset", %REG_MULTI_SZ_APPEND%, "VEN_1002&DEV_4391&REV_*"
+
+HKR, "Parameters\Device", "ExpectedMsiMessageCount", %REG_MULTI_SZ_APPEND%, "VEN_1022&DEV_7801&REV_00 8"
+
+HKR, "Parameters\Device", "NoFUACommand", %REG_MULTI_SZ_APPEND%, "HTE*"
+HKR, "Parameters\Device", "NoFUACommand", %REG_MULTI_SZ_APPEND%, "Hitachi*"
+HKR, "Parameters\Device", "NoFUACommand", %REG_MULTI_SZ_APPEND%, "HTS*"
+HKR, "Parameters\Device", "NoFUACommand", %REG_MULTI_SZ_APPEND%, "HDS*"
+HKR, "Parameters\Device", "NoFUACommand", %REG_MULTI_SZ_APPEND%, "HDT*"
+
+HKR, "Parameters\Device", "NeedSetTransferModeCommand", %REG_MULTI_SZ_APPEND%, "MCBQE64GBMPP*"
+
+HKR, "Parameters\Device", "NoLPM", %REG_MULTI_SZ_APPEND%, "WD740ADFD?00NLR1*"
+HKR, "Parameters\Device", "NoLPM", %REG_MULTI_SZ_APPEND%, "WDC WD740ADFD?00NLR1*"
+HKR, "Parameters\Device", "NoLPM", %REG_MULTI_SZ_APPEND%, "Maxtor 6V???E0*"
+HKR, "Parameters\Device", "NoLPM", %REG_MULTI_SZ_APPEND%, "Maxtor 6V???F0*"
+HKR, "Parameters\Device", "NoLPM", %REG_MULTI_SZ_APPEND%, "Maxtor 7V???E0*"
+HKR, "Parameters\Device", "NoLPM", %REG_MULTI_SZ_APPEND%, "Maxtor 7V???F0*"
+HKR, "Parameters\Device", "NoLPM", %REG_MULTI_SZ_APPEND%, "SanDisk SSD P4*"
+
+HKR, "Parameters\Device", "NoIdleD3", %REG_MULTI_SZ_APPEND%, "INTEL SSD?C??????A4"
+HKR, "Parameters\Device", "NoIdleD3", %REG_MULTI_SZ_APPEND%, "INTEL SSD?C??????A4?"
+HKR, "Parameters\Device", "NoIdleD3", %REG_MULTI_SZ_APPEND%, "INTEL SSD?C??????A4??"
+HKR, "Parameters\Device", "NoIdleD3", %REG_MULTI_SZ_APPEND%, "INTEL SSD?C??????A5"
+HKR, "Parameters\Device", "NoIdleD3", %REG_MULTI_SZ_APPEND%, "INTEL SSD?C??????A5?"
+HKR, "Parameters\Device", "NoIdleD3", %REG_MULTI_SZ_APPEND%, "INTEL SSD?C??????A5??"
+
+HKR, "Parameters\Device", "PRDTSplit", %REG_MULTI_SZ_APPEND%, "VEN_1022&DEV_43B5&REV_*"
+HKR, "Parameters\Device", "PRDTSplit", %REG_MULTI_SZ_APPEND%, "VEN_1022&DEV_43B6&REV_*"
+HKR, "Parameters\Device", "PRDTSplit", %REG_MULTI_SZ_APPEND%, "VEN_1022&DEV_43B7&REV_*"
+HKR, "Parameters\Device", "PRDTSplit", %REG_MULTI_SZ_APPEND%, "VEN_1022&DEV_43B8&REV_*"
+HKR, "Parameters\Device", "PRDTSplit", %REG_MULTI_SZ_APPEND%, "VEN_1022&DEV_43C8&REV_*"
+
+; this part is specific for Client SKUs
+[client_sku_values]
+HKR, "Parameters", "IoLatencyCap", %REG_DWORD%, 0x000001F4
+
+[storahci_EventLog_Inst]
+AddReg = storahci_EventLog_AddReg
+
+[storahci_EventLog_AddReg]
+HKR,,EventMessageFile,%REG_EXPAND_SZ%,"%%SystemRoot%%\System32\IoLogMsg.dll"
+HKR,,TypesSupported,%REG_DWORD%,7
+
+[Strings]
+Provider                  = "Open Source"
+storahci_ServiceDescription="Microsoft Standard SATA AHCI Driver"
+NCC-AHCI                  = "Standard SATA AHCI Controller (NCC)"
+PCI\CC_010601.DeviceDesc  = "Standard SATA AHCI Controller (NCC)"
+ACPI\CLS_0001&SUBCLS_0006&PI_01.DeviceDesc = "Standard SATA AHCI Controller (NCC)"
+
+SPSVCINST_ASSOCSERVICE = 0x00000002
+SERVICE_KERNEL_DRIVER  = 1
+SERVICE_BOOT_START     = 0
+SERVICE_ERROR_NORMAL   = 1
+SERVICE_ERROR_CRITICAL = 3
+REG_EXPAND_SZ          = 0x00020000
+REG_DWORD              = 0x00010001
+REG_MULTI_SZ           = 0x00010000
+REG_MULTI_SZ_APPEND    = 0x00010008

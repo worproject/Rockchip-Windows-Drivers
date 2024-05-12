@@ -1,0 +1,218 @@
+; Replace in-box stornvme.sys with patched version that
+; handles non-coherent cache.
+
+[Version]
+Signature   = "$WINDOWS NT$"
+Class       = SCSIAdapter
+ClassGUID   = {4D36E97B-E325-11CE-BFC1-08002BE10318}
+Provider    = %Provider%
+DriverVer   = ; provided by stampinf
+CatalogFile = stornvme_ncc.cat
+PnpLockdown = 1
+
+[ControlFlags]
+ExcludeFromSelect = *
+
+[SourceDisksNames]
+1 = Disk
+
+[SourceDisksFiles]
+stornvme_ncc.sys = 1
+
+[DestinationDirs]
+Stornvme_copyfiles = 12
+
+[Manufacturer]
+%Provider% = NVME, NTarm64.10.0...22621
+
+[NVME.NTarm64.10.0...22621]
+%PCI\CC_010802.DeviceDesc% = Stornvme_Inst, PCI\CC_010802
+
+[Stornvme_Inst]
+CopyFiles = Stornvme_copyfiles
+AddPowerSetting = NVMePowerSetting1,NVMePowerSetting2,NVMePowerSetting3,NVMePowerSetting4
+
+[Stornvme_copyfiles]
+stornvme_ncc.sys,,,0x100
+
+[Stornvme_Inst.HW]
+AddReg = Stornvme_Inst_HW_AddReg
+Include=pci.inf 
+Needs=PciForceSBR.HW
+
+[Stornvme_Inst_HW_AddReg]
+; registry values related to MSI support
+HKR, Interrupt Management, 0x00000010
+HKR, Interrupt Management\MessageSignaledInterruptProperties, 0x00000010
+HKR, Interrupt Management\Affinity Policy, 0x00000010
+
+;
+; The MSISupported entry determines whether the device supports MSIs. Set it to 1 to enable MSI support.
+;
+HKR, Interrupt Management\MessageSignaledInterruptProperties, MSISupported,       %REG_DWORD%,   1
+
+;
+; The MessageNumberLimit entry specifies the maximum number of MSIs to allocate. 
+; For PCI 2.2, MessageNumberLimit must be 1, 2, 4, 8, or 16. For PCI 3.0, MessageNumberLimit can be any number up to 2,048.
+; Set it to 2048 so that 2047 IO Queues and 1 Admin Queue can have different messages.
+; Note that this number should be increased to "Processor Count + 1" if the driver runs on machine with more processors.
+;
+HKR, Interrupt Management\MessageSignaledInterruptProperties, MessageNumberLimit, %REG_DWORD%,   2048
+
+;
+; Make sure all processor in group are used to serve interrupt from this device. IrqPolicySpreadMessagesAcrossAllProcessors (5)
+;
+HKR, Interrupt Management\Affinity Policy, DevicePolicy,   %REG_DWORD%, 5
+
+;
+; Specifies that the device's interrupts are of high priority. This setting is appropriate for devices that require low latency. IrqPriorityHigh (3)
+;
+HKR, Interrupt Management\Affinity Policy, DevicePriority, %REG_DWORD%, 3
+
+;
+; Allow interrupts on processors beyond group 0. (e.g. might be in a single group other than 0)
+;
+HKR, Interrupt Management\Affinity Policy, GroupPolicy, %REG_DWORD%, 1
+
+;
+; Opt into DMA remapping, but only for external hot-plug devices
+;
+HKR, DMA Management, RemappingSupported, %REG_DWORD%, 1
+HKR, DMA Management, RemappingFlags, %REG_DWORD%, 0x1
+
+[Stornvme_Inst.Services]
+AddService = stornvme, %SPSVCINST_ASSOCSERVICE%, Stornvme_Service_Inst, Stornvme_EventLog_Inst
+
+[Stornvme_Service_Inst]
+DisplayName    = %StorNVMe_ServiceDesc%
+ServiceType    = %SERVICE_KERNEL_DRIVER%
+StartType      = %SERVICE_BOOT_START%
+ErrorControl   = %SERVICE_ERROR_CRITICAL%
+ServiceBinary  = %12%\stornvme_ncc.sys
+LoadOrderGroup = SCSI Miniport
+
+AddReg         = nvme_registry_values
+AddReg         = nvme_registry_device_specific_values
+
+[nvme_registry_values]
+HKR, "Parameters\PnpInterface", "5", %REG_DWORD%, 0x00000001
+
+; NOTE: bustype 0x11 is value of BusTypeNVMe
+HKR, "Parameters", "BusType", %REG_DWORD%, 0x00000011
+
+; Default timeout value 10 seconds
+HKR, "Parameters", "IoTimeoutValue", %REG_DWORD%, 0x0000000A
+
+; NOTE: Support ByPass IO and forwarded IO
+HKR, "Parameters", "StorageSupportedFeatures", %REG_DWORD%, 0x3
+
+[nvme_registry_device_specific_values]
+HKR, "Parameters\Device", "IoStripeAlignment", %REG_MULTI_SZ_APPEND%, "VEN_8086&DEV_0953&REV_?? 128"
+HKR, "Parameters\Device", "IoStripeAlignment", %REG_MULTI_SZ_APPEND%, "VEN_8086&DEV_0984&REV_?? 128"
+HKR, "Parameters\Device", "IoStripeAlignment", %REG_MULTI_SZ_APPEND%, "VEN_8086&DEV_0A53&REV_?? 128"
+HKR, "Parameters\Device", "IoStripeAlignment", %REG_MULTI_SZ_APPEND%, "VEN_8086&DEV_0A54&REV_?? 128"
+HKR, "Parameters\Device", "IoStripeAlignment", %REG_MULTI_SZ_APPEND%, "VEN_8086&DEV_0A55&REV_?? 128"
+HKR, "Parameters\Device", "DisableF0TimestampSync", %REG_MULTI_SZ_APPEND%, "VEN_144D&DEV_A80B&REV_?? 1"
+
+[Stornvme_EventLog_Inst]
+AddReg = Stornvme_EventLog_AddReg
+
+[Stornvme_EventLog_AddReg]
+HKR,, EventMessageFile, %REG_EXPAND_SZ%, "%%SystemRoot%%\System32\IoLogMsg.dll"
+HKR,, TypesSupported,   %REG_DWORD%,     7
+
+[NVMePowerSetting1]
+; Disk subgroup
+Subgroup = {0012ee47-9041-4b5d-9b77-535fba8b1442}
+; Primary NVMe Power State Transition Latency Tolerance (ms)
+Setting =  {FC95AF4D-40E7-4B6D-835A-56D131DBC80E}, %NVMePowerLatencyToleranceName1%, %NVMePowerLatencyToleranceDesc1%,,0x00000001
+; Range 0 to 1 minute (unit: ms)
+ValueRange = 0, 60000, 1, "milliseconds"
+
+; High Performance
+Default = {8C5E7FDA-E8BF-4A96-9A85-A6E23A8C635C}, 0, 0
+Default = {8C5E7FDA-E8BF-4A96-9A85-A6E23A8C635C}, 1, 10
+; Balanced
+Default = {381B4222-F694-41F0-9685-FF5BB260DF2E}, 0, 15
+Default = {381B4222-F694-41F0-9685-FF5BB260DF2E}, 1, 50
+; Power Saving
+Default = {A1841308-3541-4FAB-BC81-F71556F20B4A}, 0, 100
+Default = {A1841308-3541-4FAB-BC81-F71556F20B4A}, 1, 200
+
+[NVMePowerSetting2]
+; Disk subgroup
+Subgroup = {0012ee47-9041-4b5d-9b77-535fba8b1442}
+; Primary NVMe Idle Timeout (ms)
+Setting =  {D639518A-E56D-4345-8AF2-B9F32FB26109}, %NVMeIdleTimeoutName1%, %NVMeIdleTimeoutDesc1%,,0x00000001
+; Range 0 to 1 minute (unit: ms)
+ValueRange = 0, 60000, 1, "milliseconds"
+
+; High Performance
+Default = {8C5E7FDA-E8BF-4A96-9A85-A6E23A8C635C}, 0, 200
+Default = {8C5E7FDA-E8BF-4A96-9A85-A6E23A8C635C}, 1, 200
+; Balanced
+Default = {381B4222-F694-41F0-9685-FF5BB260DF2E}, 0, 200
+Default = {381B4222-F694-41F0-9685-FF5BB260DF2E}, 1, 100
+; Power Saving
+Default = {A1841308-3541-4FAB-BC81-F71556F20B4A}, 0, 100
+Default = {A1841308-3541-4FAB-BC81-F71556F20B4A}, 1, 100
+
+[NVMePowerSetting3]
+; Disk subgroup
+Subgroup = {0012ee47-9041-4b5d-9b77-535fba8b1442}
+; Secondary NVMe Power State Transition Latency Tolerance (ms)
+Setting =  {DBC9E238-6DE9-49E3-92CD-8C2B4946B472}, %NVMePowerLatencyToleranceName2%, %NVMePowerLatencyToleranceDesc2%,,0x00000001
+; Range 0 to 1 minute (unit: ms)
+ValueRange = 0, 60000, 1, "milliseconds"
+
+; High Performance
+Default = {8C5E7FDA-E8BF-4A96-9A85-A6E23A8C635C}, 0, 0
+Default = {8C5E7FDA-E8BF-4A96-9A85-A6E23A8C635C}, 1, 0
+; Balanced
+Default = {381B4222-F694-41F0-9685-FF5BB260DF2E}, 0, 100
+Default = {381B4222-F694-41F0-9685-FF5BB260DF2E}, 1, 100
+; Power Saving
+Default = {A1841308-3541-4FAB-BC81-F71556F20B4A}, 0, 200
+Default = {A1841308-3541-4FAB-BC81-F71556F20B4A}, 1, 200
+
+[NVMePowerSetting4]
+; Disk subgroup
+Subgroup = {0012ee47-9041-4b5d-9b77-535fba8b1442}
+; Secondary NVMe Idle Timeout (ms)
+Setting =  {D3D55EFD-C1FF-424E-9DC3-441BE7833010}, %NVMeIdleTimeoutName2%, %NVMeIdleTimeoutDesc2%,,0x00000001
+; Range 0 to 1 minute (unit: ms)
+ValueRange = 0, 60000, 1, "milliseconds"
+
+; High Performance
+Default = {8C5E7FDA-E8BF-4A96-9A85-A6E23A8C635C}, 0, 2000
+Default = {8C5E7FDA-E8BF-4A96-9A85-A6E23A8C635C}, 1, 2000
+; Balanced
+Default = {381B4222-F694-41F0-9685-FF5BB260DF2E}, 0, 2000
+Default = {381B4222-F694-41F0-9685-FF5BB260DF2E}, 1, 1000
+; Power Saving
+Default = {A1841308-3541-4FAB-BC81-F71556F20B4A}, 0, 1000
+Default = {A1841308-3541-4FAB-BC81-F71556F20B4A}, 1, 1000
+
+;********************************************************
+[Strings]
+Provider                    = "Open Source"
+PCI\CC_010802.DeviceDesc    = "Standard NVM Express Controller (NCC)"
+StorNVMe_ServiceDesc        = "Microsoft Standard NVM Express Driver"
+NVMePowerLatencyToleranceName1 = "Primary NVMe Power State Transition Latency Tolerance"
+NVMePowerLatencyToleranceDesc1 = "When the NVMe device has been idle for a certain amount of time, transition to the lowest non-operational power state whose ENLAT+EXLAT value is less than or equal to the value specified by this setting."
+NVMeIdleTimeoutName1         = "Primary NVMe Idle Timeout"
+NVMeIdleTimeoutDesc1         = "Specifies the amount of time the NVMe device must be idle before transitioning to the primary non-operational power state."
+NVMePowerLatencyToleranceName2 = "Secondary NVMe Power State Transition Latency Tolerance"
+NVMePowerLatencyToleranceDesc2 = "After the NVMe device has been in the primary non-operational power state for a certain amount of time, transition to the lowest non-operational power state whose ENLAT+EXLAT value is less than or equal to the value specified by this setting."
+NVMeIdleTimeoutName2         = "Secondary NVMe Idle Timeout"
+NVMeIdleTimeoutDesc2         = "Specifies the amount of time the NVMe device must be in the primary non-operational power state before transitioning to the secondary non-operational power state."
+
+SPSVCINST_ASSOCSERVICE = 0x00000002
+SERVICE_KERNEL_DRIVER  = 1
+SERVICE_BOOT_START     = 0
+SERVICE_ERROR_NORMAL   = 1
+SERVICE_ERROR_CRITICAL = 3
+REG_EXPAND_SZ          = 0x00020000
+REG_DWORD              = 0x00010001
+REG_MULTI_SZ           = 0x00010000
+REG_MULTI_SZ_APPEND    = 0x00010008
