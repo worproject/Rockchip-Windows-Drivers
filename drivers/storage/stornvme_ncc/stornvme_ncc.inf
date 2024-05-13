@@ -54,10 +54,10 @@ HKR, Interrupt Management\MessageSignaledInterruptProperties, MSISupported,     
 ;
 ; The MessageNumberLimit entry specifies the maximum number of MSIs to allocate. 
 ; For PCI 2.2, MessageNumberLimit must be 1, 2, 4, 8, or 16. For PCI 3.0, MessageNumberLimit can be any number up to 2,048.
-; Set it to 2048 so that 2047 IO Queues and 1 Admin Queue can have different messages.
+; Set it to 257 so that 256 IO Queues and 1 Admin Queue can have different messages.
 ; Note that this number should be increased to "Processor Count + 1" if the driver runs on machine with more processors.
 ;
-HKR, Interrupt Management\MessageSignaledInterruptProperties, MessageNumberLimit, %REG_DWORD%,   2048
+HKR, Interrupt Management\MessageSignaledInterruptProperties, MessageNumberLimit, %REG_DWORD%,   257
 
 ;
 ; Make sure all processor in group are used to serve interrupt from this device. IrqPolicySpreadMessagesAcrossAllProcessors (5)
@@ -73,12 +73,6 @@ HKR, Interrupt Management\Affinity Policy, DevicePriority, %REG_DWORD%, 3
 ; Allow interrupts on processors beyond group 0. (e.g. might be in a single group other than 0)
 ;
 HKR, Interrupt Management\Affinity Policy, GroupPolicy, %REG_DWORD%, 1
-
-;
-; Opt into DMA remapping, but only for external hot-plug devices
-;
-HKR, DMA Management, RemappingSupported, %REG_DWORD%, 1
-HKR, DMA Management, RemappingFlags, %REG_DWORD%, 0x1
 
 [Stornvme_Inst.Services]
 AddService = stornvme, %SPSVCINST_ASSOCSERVICE%, Stornvme_Service_Inst, Stornvme_EventLog_Inst
@@ -103,8 +97,11 @@ HKR, "Parameters", "BusType", %REG_DWORD%, 0x00000011
 ; Default timeout value 10 seconds
 HKR, "Parameters", "IoTimeoutValue", %REG_DWORD%, 0x0000000A
 
-; NOTE: Support ByPass IO and forwarded IO
-HKR, "Parameters", "StorageSupportedFeatures", %REG_DWORD%, 0x3
+; Default DMAR settings 2, where 2 = opt in, but only for external hot-plug devices
+HKR, "Parameters", "DmaRemappingCompatible", %REG_DWORD%, 2
+
+; NOTE: Support ByPass IO
+HKR, "Parameters", "StorageSupportedFeatures", %REG_DWORD%, 0x1
 
 [nvme_registry_device_specific_values]
 HKR, "Parameters\Device", "IoStripeAlignment", %REG_MULTI_SZ_APPEND%, "VEN_8086&DEV_0953&REV_?? 128"
@@ -112,7 +109,6 @@ HKR, "Parameters\Device", "IoStripeAlignment", %REG_MULTI_SZ_APPEND%, "VEN_8086&
 HKR, "Parameters\Device", "IoStripeAlignment", %REG_MULTI_SZ_APPEND%, "VEN_8086&DEV_0A53&REV_?? 128"
 HKR, "Parameters\Device", "IoStripeAlignment", %REG_MULTI_SZ_APPEND%, "VEN_8086&DEV_0A54&REV_?? 128"
 HKR, "Parameters\Device", "IoStripeAlignment", %REG_MULTI_SZ_APPEND%, "VEN_8086&DEV_0A55&REV_?? 128"
-HKR, "Parameters\Device", "DisableF0TimestampSync", %REG_MULTI_SZ_APPEND%, "VEN_144D&DEV_A80B&REV_?? 1"
 
 [Stornvme_EventLog_Inst]
 AddReg = Stornvme_EventLog_AddReg

@@ -139,12 +139,6 @@ HKR, Interrupt Management\Affinity Policy, GroupPolicy, %REG_DWORD%, 1
 ; Enables Storport IPM for this adapter
 HKR, "StorPort", "EnableIdlePowerManagement", %REG_DWORD%, 0x01
 
-;
-; Opt into DMA remapping, but only for external hot-plug devices
-;
-HKR, DMA Management, RemappingSupported, %REG_DWORD%, 1
-HKR, DMA Management, RemappingFlags, %REG_DWORD%, 0x1
-
 [storahci_Inst.Services]
 AddService = storahci, %SPSVCINST_ASSOCSERVICE%, storahci_Service_Inst_Client, storahci_EventLog_Inst
 
@@ -158,6 +152,7 @@ LoadOrderGroup = SCSI Miniport
 AddReg         = storahci_general_values
 AddReg         = device_specific_values
 AddReg         = client_sku_values
+AddReg         = storahci_dmar_values
 
 [storahci_general_values]
 HKLM, "SYSTEM\CurrentControlSet\Control\Compatibility\Driver\storahci_ncc.sys", "Shims", %REG_MULTI_SZ_APPEND%, "Srbshim"
@@ -167,6 +162,10 @@ HKR, "Parameters", "BusType", %REG_DWORD%, 0x0000000B
 HKR, "Parameters", "IoTimeoutValue", %REG_DWORD%, 0x0000001E
 HKR, "Parameters", "BusyRetryCount", %REG_DWORD%, 0x000000F0
 HKR, "Parameters", "BusyPauseTimeInMs", %REG_DWORD%, 0x000001F4
+
+[storahci_dmar_values]
+; Default DMAR settings 2, where 2 = opt in, but only for external hot-plug devices
+HKR, "Parameters", "DmaRemappingCompatible", %REG_DWORD%, 2
 
 [device_specific_values]
 HKR, "Parameters\Device", "ResetInInit", %REG_MULTI_SZ_APPEND%, "VEN_1106&DEV_6287&REV_*"
