@@ -33,6 +33,7 @@ storahci_copyfiles = 12
 storahci_ncc.sys,,,0x100
 
 [storahci_Inst]
+FeatureScore = 1
 CopyFiles = storahci_copyfiles
 AddPowerSetting=AhciPowerSetting1,AhciPowerSetting2
 

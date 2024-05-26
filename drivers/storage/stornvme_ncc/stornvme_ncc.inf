@@ -29,6 +29,7 @@ Stornvme_copyfiles = 12
 %PCI\CC_010802.DeviceDesc% = Stornvme_Inst, PCI\CC_010802
 
 [Stornvme_Inst]
+FeatureScore = 1
 CopyFiles = Stornvme_copyfiles
 AddPowerSetting = NVMePowerSetting1,NVMePowerSetting2,NVMePowerSetting3,NVMePowerSetting4
 
