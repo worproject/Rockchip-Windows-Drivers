@@ -19,7 +19,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "csaudio-Filters", "..\drive
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "csaudio-Inc", "..\drivers\audio\csaudiork3x\Source\Inc\Inc.vcxproj", "{4B664BA5-057A-41B8-B365-2C99065C4DFA}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "csaudio-Main", "..\drivers\audio\csaudiork3x\Source\Main\Main.vcxproj", "{E4DF0EEE-D35B-47F2-A9B1-41EA97C465FF}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "csaudiork3x", "..\drivers\audio\csaudiork3x\Source\Main\Main.vcxproj", "{E4DF0EEE-D35B-47F2-A9B1-41EA97C465FF}"
 	ProjectSection(ProjectDependencies) = postProject
 		{33E61864-6F2C-4F9F-BE70-8F8985A4F283} = {33E61864-6F2C-4F9F-BE70-8F8985A4F283}
 		{771312CF-E5A2-4676-8142-86CEBDF99E2B} = {771312CF-E5A2-4676-8142-86CEBDF99E2B}
@@ -30,6 +30,10 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "dwc_eqos", "..\drivers\net\dwc_eqos\dwc_eqos.vcxproj", "{CAD465B6-97D7-402D-85F8-50DE140A6D9D}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "usbehci_nointerlocked", "..\drivers\usb\usbehci_nointerlocked\usbehci_nointerlocked.vcxproj", "{BB0C35DD-3009-4CA5-86C8-B255D378A84B}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "arm_smc_lib", "..\drivers\lib\arm_smc_lib\arm_smc_lib.vcxproj", "{CC2E02D4-6550-4F1A-A43A-90B6BEB161D0}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "rk_sip_sdmmc_lib", "..\drivers\sd\rk_sip_sdmmc_lib\rk_sip_sdmmc_lib.vcxproj", "{3F0E7D7D-BB1E-42F9-841F-75204A447CC6}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -107,6 +111,18 @@ Global
 		{BB0C35DD-3009-4CA5-86C8-B255D378A84B}.Release|ARM64.ActiveCfg = Release|ARM64
 		{BB0C35DD-3009-4CA5-86C8-B255D378A84B}.Release|ARM64.Build.0 = Release|ARM64
 		{BB0C35DD-3009-4CA5-86C8-B255D378A84B}.Release|ARM64.Deploy.0 = Release|ARM64
+		{CC2E02D4-6550-4F1A-A43A-90B6BEB161D0}.Debug|ARM64.ActiveCfg = Debug|ARM64
+		{CC2E02D4-6550-4F1A-A43A-90B6BEB161D0}.Debug|ARM64.Build.0 = Debug|ARM64
+		{CC2E02D4-6550-4F1A-A43A-90B6BEB161D0}.Debug|ARM64.Deploy.0 = Debug|ARM64
+		{CC2E02D4-6550-4F1A-A43A-90B6BEB161D0}.Release|ARM64.ActiveCfg = Release|ARM64
+		{CC2E02D4-6550-4F1A-A43A-90B6BEB161D0}.Release|ARM64.Build.0 = Release|ARM64
+		{CC2E02D4-6550-4F1A-A43A-90B6BEB161D0}.Release|ARM64.Deploy.0 = Release|ARM64
+		{3F0E7D7D-BB1E-42F9-841F-75204A447CC6}.Debug|ARM64.ActiveCfg = Debug|ARM64
+		{3F0E7D7D-BB1E-42F9-841F-75204A447CC6}.Debug|ARM64.Build.0 = Debug|ARM64
+		{3F0E7D7D-BB1E-42F9-841F-75204A447CC6}.Debug|ARM64.Deploy.0 = Debug|ARM64
+		{3F0E7D7D-BB1E-42F9-841F-75204A447CC6}.Release|ARM64.ActiveCfg = Release|ARM64
+		{3F0E7D7D-BB1E-42F9-841F-75204A447CC6}.Release|ARM64.Build.0 = Release|ARM64
+		{3F0E7D7D-BB1E-42F9-841F-75204A447CC6}.Release|ARM64.Deploy.0 = Release|ARM64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
