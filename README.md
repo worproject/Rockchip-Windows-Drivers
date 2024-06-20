@@ -11,7 +11,7 @@ This repository contains drivers for RK35xx-based platforms, with a focus on RK3
 |PCIe 3.0 & 2.1|pci (Inbox)|🟡 Partially working|Devices may work if drivers are available for them. Known issues include:<br> - NVMe SSDs do not work with in-box storport.sys (issue #6, workaround available).<br> - Devices that require cache-coherent bus or MSI do not work (e.g. Qualcomm Wi-Fi cards).<br> - Devices that require a root PCIe port do not work (e.g. XHCI).|
 |SATA|storahci (Inbox)|🔴 Not working|SATA SSDs do not work with in-box storport.sys (issue #6, workaround available).|
 |eMMC|[dwcsdhc](https://github.com/worproject/Rockchip-Windows-Drivers/tree/master/drivers/sd/dwcsdhc)|🟢 Working||
-|SD/SDIO||🔴 Not working||
+|SD/SDIO|[dwcmshc](https://github.com/worproject/Rockchip-Windows-Drivers/tree/master/drivers/sd/dwcmshc)|🟢 Working||
 |CPU frequency scaling||🔴 Not working|Clocks limited at values set by UEFI.|
 |HDMI output|MSBDD (Inbox)|🟡 Partially working|Single display with mode limited at 1080p 60 Hz, provided by UEFI GOP.|
 |HDMI input||🔴 Not working||

@@ -1,0 +1,16 @@
+﻿#include <windows.h>
+#include <ntverp.h>
+
+#undef VER_PRODUCTNAME_STR
+#undef VER_COMPANYNAME_STR
+
+#define VER_FILETYPE                    VFT_DRV
+#define VER_FILESUBTYPE                 VFT2_DRV_SYSTEM
+#define VER_COMPANYNAME_STR             "Windows on R Project"
+#define VER_FILEDESCRIPTION_STR         "Synopsys DesignWare Cores Mobile Storage Host Controller Driver"
+#define VER_INTERNALNAME_STR            "dwcsdhc.sys"
+#define VER_LEGALCOPYRIGHT_STR          "Copyright (c) 2024 Mario Bălănică. All Rights Reserved."
+#define VER_ORIGINALFILENAME_STR        VER_INTERNALNAME_STR
+#define VER_PRODUCTNAME_STR             VER_FILEDESCRIPTION_STR
+
+#include "common.ver"
