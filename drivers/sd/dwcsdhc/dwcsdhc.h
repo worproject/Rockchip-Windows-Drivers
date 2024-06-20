@@ -27,29 +27,9 @@ Environment:
 #pragma warning(disable:4115)   // named type definition in parentheses
 
 //
-// RKCP0D40 Device Specific Method UUID
-//
-// {434addb0-8ff3-49d5-a724-95844b79ad1f}
-//
-DEFINE_GUID(
-    RKCP0D40_DSM_GUID,
-    0x434addb0, 0x8ff3, 0x49d5, 0xa7, 0x24, 0x95, 0x84, 0x4b, 0x79, 0xad, 0x1f);
-
-//
-// ACPI _DSM function to set card clock.
-//
-#define RKCP0D40_DSM_FUNCTION_IDX_SET_CARD_CLOCK        1
-#define RKCP0D40_DSM_FUNCTION_REVISION_SET_CARD_CLOCK   0
-
-//
 // Allocation tag
 //
 #define SDHC_ALLOC_TAG              ULONG('ScwD')
-
-//
-// MMIO length
-//
-#define SDHC_EXPECTED_ACPI_LENGTH       0x10000
 
 //
 // Memory registers
@@ -1413,11 +1393,6 @@ typedef struct _SDHC_EXTENSION {
     //
 
     BOOLEAN CrashdumpMode;
-
-    //
-    // Associated PDO
-    //
-    PDEVICE_OBJECT PdoPtr;
       
 } SDHC_EXTENSION, *PSDHC_EXTENSION;
 
@@ -1820,13 +1795,6 @@ NTSTATUS
 DwcSdhcRkConfigurePhy(
     _In_ PSDHC_EXTENSION SdhcExtension,
     _In_ ULONG Frequency
-    );
-
-NTSTATUS
-DwcSdhcRkDsmSetCardClock(
-    _In_ PSDHC_EXTENSION SdhcExtension,
-    _In_ ULONG TargetFrequency,
-    _Out_ PULONG ActualFrequency
     );
 
 NTSTATUS

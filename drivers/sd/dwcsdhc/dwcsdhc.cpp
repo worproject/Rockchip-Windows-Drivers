@@ -22,6 +22,7 @@ Environment:
 #include "precomp.h"
 #pragma hdrstop
 #include <acpiutil.hpp>
+#include <rk_sip_sdmmc.h>
 
 #include "dwcsdhc.h"
 
@@ -221,98 +222,6 @@ Return value:
                   sizeof(SdhcExtension->Capabilities));
 }
 
-BOOLEAN 
-FindPhysicalBaseInCmResList(
-    _In_ PHYSICAL_ADDRESS PhysicalBase,
-    _In_ PCM_RESOURCE_LIST ResListTranslated
-    )
-{
-    PCM_FULL_RESOURCE_DESCRIPTOR FullResDescriptor;
-    FullResDescriptor = ResListTranslated->List;
-
-    for (ULONG FullResIndex = 0; FullResIndex < ResListTranslated->Count; FullResIndex++) {
-
-        for (ULONG PartialResIndex = 0;
-            PartialResIndex < FullResDescriptor->PartialResourceList.Count;
-            PartialResIndex++) {
-
-            PCM_PARTIAL_RESOURCE_DESCRIPTOR PartialResDescriptor;
-            PartialResDescriptor =
-                FullResDescriptor->PartialResourceList.PartialDescriptors + PartialResIndex;
-
-            switch (PartialResDescriptor->Type)
-            {
-                case CmResourceTypeMemory:
-                    if (PartialResDescriptor->u.Memory.Length == SDHC_EXPECTED_ACPI_LENGTH
-                        && PartialResDescriptor->u.Memory.Start.QuadPart == PhysicalBase.QuadPart) {
-                        return TRUE;
-                    }
-                    break;
-                }
-        }
-
-        FullResDescriptor = (PCM_FULL_RESOURCE_DESCRIPTOR)(FullResDescriptor->PartialResourceList.PartialDescriptors +
-            FullResDescriptor->PartialResourceList.Count);
-    }
-
-    return FALSE;
-}
-
-NTSTATUS
-FindMiniportPdoByPhysicalBase(
-    _In_ PHYSICAL_ADDRESS PhysicalBase,
-    _Out_ PDEVICE_OBJECT* FoundPdo
-    )
-{
-    NTSTATUS Status = STATUS_SUCCESS;
-    PDEVICE_OBJECT Fdo = NULL;
-    PDEVICE_OBJECT Pdo = NULL;
-    ULONG ResultLength = 0;
-    BOOLEAN FoundAddress = FALSE;
-
-    *FoundPdo = NULL;
-
-    for (Fdo = s_pDriverObject->DeviceObject; Fdo != NULL; Fdo = Fdo->NextDevice) {
-        Pdo = Fdo->DeviceObjectExtension->AttachedTo;
-
-        Status = IoGetDeviceProperty(Pdo, DevicePropertyBootConfigurationTranslated, 
-            0, NULL, &ResultLength);
-
-        if (Status != STATUS_BUFFER_TOO_SMALL) {
-            return Status;
-        }
-
-        PCM_RESOURCE_LIST ResListTranslated;
-        ResListTranslated = (PCM_RESOURCE_LIST) ExAllocatePoolZero(NonPagedPool, 
-            ResultLength, SDHC_ALLOC_TAG);
-
-        if (ResListTranslated == NULL) {
-            return STATUS_INSUFFICIENT_RESOURCES;
-        }
-
-        Status = IoGetDeviceProperty(Pdo, DevicePropertyBootConfigurationTranslated,
-             ResultLength, ResListTranslated, &ResultLength);
-
-        if (NT_SUCCESS(Status)) {
-            FoundAddress = FindPhysicalBaseInCmResList(PhysicalBase, ResListTranslated);
-        }
-
-        ExFreePoolWithTag(ResListTranslated, SDHC_ALLOC_TAG);
-
-        if (FoundAddress) {
-            break;
-        }
-    }
-
-    if (FoundAddress) {
-        *FoundPdo = Pdo;
-    } else {
-        Status = STATUS_DEVICE_CONFIGURATION_ERROR;
-    }
-
-    return Status;
-}
-
 NTSTATUS
 SdhcSlotInitialize(
     _In_ PVOID PrivateExtension,
@@ -357,19 +266,8 @@ Return value:
     ULONG CurrentLimitShift;
     PSDHC_EXTENSION SdhcExtension;
     USHORT SpecVersion;
-    NTSTATUS Status;
 
     SdhcExtension = (PSDHC_EXTENSION) PrivateExtension;
-
-    //
-    // Find and save a pointer to this miniport's PDO in the device extension,
-    // we need it to issue ACPI driver calls.
-    //
-
-    Status = FindMiniportPdoByPhysicalBase(PhysicalBase, &SdhcExtension->PdoPtr);
-    if (!NT_SUCCESS(Status)) {
-        return Status;
-    }
 
     //
     // Initialize the SDHC_EXTENSION register space.
@@ -1319,38 +1217,6 @@ DwcSdhcRkConfigurePhy(
 }
 
 NTSTATUS
-DwcSdhcRkDsmSetCardClock(
-    _In_ PSDHC_EXTENSION SdhcExtension,
-    _In_ ULONG TargetFrequency,
-    _Out_ PULONG ActualFrequency
-    )
-{
-    NTSTATUS Status = STATUS_SUCCESS;
-    ACPI_EVAL_OUTPUT_BUFFER UNALIGNED* ReturnBufferPtr = nullptr;
-
-    ACPI_METHOD_ARGUMENT SetClockArg;
-    ACPI_METHOD_SET_ARGUMENT_INTEGER((&SetClockArg), TargetFrequency);
-
-    Status = AcpiExecuteDsmFunction(SdhcExtension->PdoPtr,
-        &RKCP0D40_DSM_GUID,
-        RKCP0D40_DSM_FUNCTION_REVISION_SET_CARD_CLOCK,
-        RKCP0D40_DSM_FUNCTION_IDX_SET_CARD_CLOCK,
-        &SetClockArg,
-        sizeof(SetClockArg),
-        &ReturnBufferPtr);
-
-    if (!NT_SUCCESS(Status)) {
-        return Status;
-    }
-
-    *ActualFrequency = ReturnBufferPtr->Argument[0].Argument;
-
-    ExFreePoolWithTag(ReturnBufferPtr, ACPI_TAG_EVAL_OUTPUT_BUFFER);
-
-    return Status;
-}
-
-NTSTATUS
 DwcSdhcRkSetClock(
     _In_ PSDHC_EXTENSION SdhcExtension,
     _In_ ULONG TargetFrequencyKhz
@@ -1358,17 +1224,16 @@ DwcSdhcRkSetClock(
 {
     NTSTATUS Status;
 
-    ULONG ActualFrequencyHz = 0;
-
-    Status = DwcSdhcRkDsmSetCardClock(SdhcExtension,
-        TargetFrequencyKhz * 1000, // Hz
-        &ActualFrequencyHz);
+    Status = RkSipSdmmcClockRateSet(
+        (ULONG_PTR)SdhcExtension->PhysicalBaseAddress.QuadPart,
+        RK_SIP_SDMMC_CLOCK_ID_EMMC_CCLK,
+        TargetFrequencyKhz * 1000);
 
     if (!NT_SUCCESS(Status)) {
         return Status;
     }
 
-    return DwcSdhcRkConfigurePhy(SdhcExtension, ActualFrequencyHz);
+    return DwcSdhcRkConfigurePhy(SdhcExtension, TargetFrequencyKhz);
 }
 
 _IRQL_requires_max_(PASSIVE_LEVEL)

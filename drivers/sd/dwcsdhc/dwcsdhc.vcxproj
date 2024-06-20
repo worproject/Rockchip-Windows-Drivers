@@ -54,11 +54,7 @@
       <AdditionalDependencies>%(AdditionalDependencies);$(DDK_LIB_PATH)\sdport.lib;$(DDK_LIB_PATH)\ntoskrnl.lib</AdditionalDependencies>
     </Link>
     <ClCompile>
-      <TreatWarningAsError>true</TreatWarningAsError>
-      <WarningLevel>Level4</WarningLevel>
-      <ExceptionHandling>
-      </ExceptionHandling>
-      <AdditionalIncludeDirectories>..\..\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\include;..\rk_sip_sdmmc_lib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <DriverSign>
       <FileDigestAlgorithm>sha256</FileDigestAlgorithm>
@@ -69,11 +65,7 @@
       <AdditionalDependencies>%(AdditionalDependencies);$(DDK_LIB_PATH)\sdport.lib;$(DDK_LIB_PATH)\ntoskrnl.lib</AdditionalDependencies>
     </Link>
     <ClCompile>
-      <TreatWarningAsError>true</TreatWarningAsError>
-      <WarningLevel>Level4</WarningLevel>
-      <ExceptionHandling>
-      </ExceptionHandling>
-      <AdditionalIncludeDirectories>..\..\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\include;..\rk_sip_sdmmc_lib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <DriverSign>
       <FileDigestAlgorithm>sha256</FileDigestAlgorithm>
@@ -96,6 +88,11 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Exclude="@(ClInclude)" Include="*.h;*.hpp;*.hxx;*.hm;*.inl;*.xsd" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\rk_sip_sdmmc_lib\rk_sip_sdmmc_lib.vcxproj">
+      <Project>{3f0e7d7d-bb1e-42f9-841f-75204a447cc6}</Project>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>
