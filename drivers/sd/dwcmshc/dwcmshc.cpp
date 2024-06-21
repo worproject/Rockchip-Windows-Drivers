@@ -1442,10 +1442,6 @@ MshcResetHost(
     if ((ResetType == SdResetTypeDat) &&
         MshcExtension->TuningPerformed &&
         (MshcExtension->DataCrcErrorsSinceLastTuning >= MSHC_DCRC_ERROR_RETUNING_THRESHOLD)) {
-
-        MshcExtension->TuningPerformed = FALSE;
-        MshcExtension->DataCrcErrorsSinceLastTuning = 0;
-
         MSHC_LOG_WARN(
             MshcExtension->LogHandle,
             MshcExtension,
@@ -1816,6 +1812,9 @@ MshcExecuteTuning(
 
     Status = STATUS_NOT_IMPLEMENTED;
     PlatformOperations = MshcExtension->PlatformOperations;
+
+    MshcExtension->TuningPerformed = FALSE;
+    MshcExtension->DataCrcErrorsSinceLastTuning = 0;
 
     if (PlatformOperations->ExecuteTuning != NULL) {
         Status = PlatformOperations->ExecuteTuning(MshcExtension);
