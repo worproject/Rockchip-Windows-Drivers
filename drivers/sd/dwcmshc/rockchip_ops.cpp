@@ -126,7 +126,7 @@ MshcRockchipSetVoltage(
             Status);
     }
 
-    return STATUS_SUCCESS;
+    return Status;
 }
 
 NTSTATUS
@@ -150,7 +150,7 @@ MshcRockchipSetSignalingVoltage(
             Status);
     }
 
-    return STATUS_SUCCESS;
+    return Status;
 }
 
 NTSTATUS

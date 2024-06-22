@@ -1045,6 +1045,10 @@ MshcSlotGetResponse(
         NT_ASSERTMSG("Invalid response type!", FALSE);
     }
 
+    if (Command->Index == SDCMD_SEND_RELATIVE_ADDR) {
+        MshcExtension->CardRca = Response[0] >> 16;
+    }
+
     MSHC_LOG_EXIT(MshcExtension->LogHandle, MshcExtension, "()");
 }
 
@@ -1403,20 +1407,6 @@ MshcResetHost(
     }
 
     if (ResetType == SdResetTypeAll) {
-        // Mask all interrupts, sdport will toggle them as needed.
-        MshcDisableInterrupts(MshcExtension, MSHC_INT_ALL, MSHC_IDINT_ALL);
-
-        // Global interrupt enable
-        MshcWriteRegister(MshcExtension, MSHC_CTRL, MSHC_CTRL_INT_ENABLE);
-
-        // Set the max HW timeout for bus operations.
-        MshcWriteRegister(MshcExtension, MSHC_TMOUT, 0xffffffff);
-
-        //
-        // Bring the slot in its initial state.
-        //
-        MshcSetClock(MshcExtension, 0);
-
         //
         // WORKAROUND:
         // In crashdump mode, sdport will switch to an UHS-I mode
@@ -1425,11 +1415,28 @@ MshcResetHost(
         // for the best...
         //
         if (!gCrashdumpMode) {
+            //
+            // Reset voltages.
+            // We don't trust sdport to always do it when needed.
+            //
             MshcSetVoltage(MshcExtension, SdBusVoltageOff);
             MshcSetSignalingVoltage(MshcExtension, SdSignalingVoltage33);
         }
 
+        // Disable clock
+        MshcSetClock(MshcExtension, 0);
+
+        // Reset bus width
         MshcSetBusWidth(MshcExtension, SdBusWidth1Bit);
+
+        // Mask all interrupts, sdport will toggle them as needed.
+        MshcDisableInterrupts(MshcExtension, MSHC_INT_ALL, MSHC_IDINT_ALL);
+
+        // Global interrupt enable
+        MshcWriteRegister(MshcExtension, MSHC_CTRL, MSHC_CTRL_INT_ENABLE);
+
+        // Set the max HW timeout for bus operations.
+        MshcWriteRegister(MshcExtension, MSHC_TMOUT, 0xffffffff);
     }
 
     // Acknowledge any pending interrupts.
@@ -1494,12 +1501,14 @@ MshcSetVoltage(
         Status = PlatformOperations->SetVoltage(MshcExtension, Voltage);
     }
 
+    MshcExtension->CardPowerControlSupported = NT_SUCCESS(Status);
+
     //
     // Wait 10ms for regulator to stabilize.
     //
     SdPortWait(10000);
 
-    return Status;
+    return STATUS_SUCCESS;
 }
 
 _Use_decl_annotations_
@@ -1707,11 +1716,37 @@ MshcSetSignalingVoltage(
 
     switch (Voltage) {
     case SdSignalingVoltage33:
+        //
+        // The card should've been power cycled for its signaling level to
+        // return to 3.3V. If the platform does not support power control and the
+        // card was already initialized at 1.8V, it's unsafe to change voltage here.
+        // Stay at the current level, since sdport will not switch to 1.8V again
+        // if the card responds with S18A = 0 to ACMD41.
+        //
+        if ((MshcExtension->SignalingVoltage == SdSignalingVoltage18) &&
+            !MshcExtension->CardPowerControlSupported) {
+            //
+            // Issue SEND_STATUS. If it fails, the card was either removed
+            // or isn't actually initialized yet (RCA won't match -> timeout).
+            // We will allow the voltage switch only in this case.
+            //
+            ULONG StatusRegister = 0;
+            Status = MshcSendStatusCommand(MshcExtension, &StatusRegister);
+            if (NT_SUCCESS(Status)) {
+                MSHC_LOG_WARN(
+                    MshcExtension->LogHandle,
+                    MshcExtension,
+                    "Not changing signaling for current card - power control unsupported!");
+                return STATUS_SUCCESS;
+            }
+        }
         Switch18v = FALSE;
         break;
+
     case SdSignalingVoltage18:
         Switch18v = TRUE;
         break;
+
     default:
         NT_ASSERTMSG("Invalid signaling voltage!", FALSE);
         return STATUS_INVALID_PARAMETER;
@@ -1796,6 +1831,10 @@ MshcSetSignalingVoltage(
         // Enable interrupts back.
         //
         MshcEnableGlobalInterrupt(MshcExtension, TRUE);
+    }
+
+    if (NT_SUCCESS(Status)) {
+        MshcExtension->SignalingVoltage = Voltage;
     }
 
     return Status;
@@ -2818,6 +2857,39 @@ MshcSendStopCommand(
     Request.Type = SdRequestTypeCommandNoTransfer;
 
     return MshcIssueRequestSynchronously(MshcExtension, &Request, 1000000, FALSE);
+}
+
+_Use_decl_annotations_
+NTSTATUS
+MshcSendStatusCommand(
+    _In_ PMSHC_EXTENSION MshcExtension,
+    _Out_ PULONG StatusRegister
+    )
+{
+    NTSTATUS Status;
+    SDPORT_REQUEST Request;
+
+    RtlZeroMemory(&Request, sizeof(Request));
+
+    Request.Command.Index = SDCMD_SEND_STATUS;
+    Request.Command.Class = SdCommandClassStandard;
+    Request.Command.ResponseType = SdResponseTypeR1;
+    Request.Command.TransferType = SdTransferTypeNone;
+    Request.Command.Argument = MshcExtension->CardRca << 16;
+
+    //
+    // Send the command.
+    //
+    Request.Type = SdRequestTypeCommandNoTransfer;
+
+    Status = MshcIssueRequestSynchronously(MshcExtension, &Request, 50000, TRUE);
+    if (!NT_SUCCESS(Status)) {
+        return Status;
+    }
+
+    MshcSlotGetResponse(MshcExtension, &Request.Command, StatusRegister);
+
+    return Status;
 }
 
 _Use_decl_annotations_
