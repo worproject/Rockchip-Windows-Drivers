@@ -429,8 +429,10 @@ typedef struct _MSHC_IDMAC_DESCRIPTOR {
 // Standard SD/MMC commands
 //
 #define SDCMD_GO_IDLE_STATE             0
+#define SDCMD_SEND_RELATIVE_ADDR        3
 #define SDCMD_VOLTAGE_SWITCH            11
 #define SDCMD_STOP_TRANSMISSION         12
+#define SDCMD_SEND_STATUS               13
 #define SDCMD_GO_INACTIVE_STATE         15
 #define SDCMD_SEND_TUNING_BLOCK         19
 #define SDCMD_EMMC_SEND_TUNING_BLOCK    21
@@ -544,6 +546,9 @@ struct _MSHC_EXTENSION {
     // Current bus configuration
     //
     BOOLEAN CardInitialized;
+    BOOLEAN CardPowerControlSupported;
+    USHORT CardRca;
+    SDPORT_SIGNALING_VOLTAGE SignalingVoltage;
     SDPORT_BUS_SPEED BusSpeed;
     SDPORT_BUS_WIDTH BusWidth;
     ULONG BusFrequencyKhz;
@@ -819,6 +824,13 @@ _IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 MshcSendStopCommand(
     _In_ PMSHC_EXTENSION MshcExtension
+    );
+
+_IRQL_requires_max_(APC_LEVEL)
+NTSTATUS
+MshcSendStatusCommand(
+    _In_ PMSHC_EXTENSION MshcExtension,
+    _Out_ PULONG StatusRegister
     );
 
 _IRQL_requires_max_(APC_LEVEL)
