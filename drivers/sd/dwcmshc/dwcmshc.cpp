@@ -864,7 +864,7 @@ MshcSlotInterrupt(
     }
 
     if (Rintsts & MSHC_INT_CD) {
-        *CardChange = TRUE;
+        *CardChange = !MshcExtension->PlatformInfo->Capabilities.BrokenCd;
         Rintsts &= ~MSHC_INT_CD;
     }
 
@@ -1083,6 +1083,10 @@ MshcSlotToggleEvents(
     // we should continue normal operation and not treat it as an error.
     //
     Intsts |= MSHC_INT_HTO;
+
+    if (MshcExtension->PlatformInfo->Capabilities.BrokenCd) {
+        Intsts &= ~MSHC_INT_CD;
+    }
 
     if (Enable) {
         MshcEnableInterrupts(MshcExtension, Intsts, Idsts);
@@ -3127,6 +3131,10 @@ MshcIsCardInserted(
 {
     ULONG Cdetect;
 
+    if (MshcExtension->PlatformInfo->Capabilities.BrokenCd) {
+        return TRUE;
+    }
+
     Cdetect = MshcReadRegister(MshcExtension, MSHC_CDETECT);
 
     return (Cdetect & MSHC_CDETECT_CARD_DETECT_N(MshcExtension->SlotId)) == 0;
@@ -3189,6 +3197,7 @@ MshcQueryAcpiPlatformCapabilities(
     AcpiDevicePropertiesQueryIntegerValue(Properties, "sd-uhs-sdr104", &Capabilities->SupportSdr104);
     AcpiDevicePropertiesQueryIntegerValue(Properties, "mmc-hs200-1_8v", &Capabilities->SupportHs200);
     AcpiDevicePropertiesQueryIntegerValue(Properties, "no-1-8-v", &Capabilities->No18vRegulator);
+    AcpiDevicePropertiesQueryIntegerValue(Properties, "broken-cd", &Capabilities->BrokenCd);
 
     Status = STATUS_SUCCESS;
 
