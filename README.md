@@ -48,7 +48,7 @@ This repository contains drivers for RK35xx-based platforms, with a focus on RK3
 The resulting driver binaries will be located in the `Rockchip-Windows-Drivers\build\ARM64\Debug\Output` (or Release) directory.
 
 ## Firmware
-The UEFI + ACPI implementation needed to run Windows and these drivers is available at <https://github.com/edk2-porting/edk2-rk35xx>.
+The UEFI + ACPI implementation that is needed to run Windows and these drivers are available at <https://github.com/edk2-porting/edk2-rk35xx>.
 
 ## Credits
 **Driver signing provided by [Theo](https://github.com/td512) @ [CHASE®](https://chase.net.nz/)**
