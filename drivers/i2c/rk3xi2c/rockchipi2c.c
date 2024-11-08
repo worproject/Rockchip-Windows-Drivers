@@ -186,8 +186,10 @@ static void rk3x_i2c_handle_write(PRK3XI2C_CONTEXT pDevice, unsigned int ipd)
 	write32(pDevice, REG_IPD, REG_INT_MBTF);
 
 	/* are we finished? */
-	if (pDevice->processed >= pDevice->currentDescriptor.TransferLength)
+	if (pDevice->processed >= pDevice->currentDescriptor.TransferLength) {
+		pDevice->isLastMsg = TRUE;
 		rk3x_i2c_stop(pDevice, pDevice->transactionStatus);
+	}
 	else
 		rk3x_i2c_fill_transmit_buf(pDevice);
 }
@@ -227,8 +229,10 @@ static void rk3x_i2c_handle_read(PRK3XI2C_CONTEXT pDevice, unsigned int ipd)
 	}
 
 	/* are we finished? */
-	if (pDevice->processed >= pDevice->currentDescriptor.TransferLength)
+	if (pDevice->processed >= pDevice->currentDescriptor.TransferLength) {
+		pDevice->isLastMsg = TRUE;
 		rk3x_i2c_stop(pDevice, pDevice->transactionStatus);
+	}
 	else
 		rk3x_i2c_prepare_read(pDevice);
 }
