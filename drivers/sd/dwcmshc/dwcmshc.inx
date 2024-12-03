@@ -27,7 +27,7 @@ PnpLockdown = 1
 dwcmshc.sys = 1
 
 [Manufacturer]
-%RKCP% = RKCP,NT$ARCH$
+%RKCP% = RKCP,NT$ARCH$.10.0...16299
 
 [ControlFlags]
 ExcludeFromSelect = *
@@ -36,7 +36,7 @@ ExcludeFromSelect = *
 ; Rockchip models
 ;
 
-[RKCP.NT$ARCH$]
+[RKCP.NT$ARCH$.10.0...16299]
 %DWCMSHC.DeviceDesc% = ROCKCHIP, ACPI\RKCPFE2C
 
 ;
