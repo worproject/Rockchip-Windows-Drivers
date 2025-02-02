@@ -161,26 +161,26 @@ static int _period(BOOLEAN dryRun, UINT8 buf[],
 	}
 
 	/* loop1 */
-	off += _emit_LP(dryRun, &buf[off], 1, lcnt1);
+	off += _emit_LP(dryRun, &buf[off], 1, (UINT8)lcnt1);
 	ljmp1 = off;
 	off += _bursts(dryRun, &buf[off], pxs, cyc);
 	lpend.cond = ALWAYS;
 	lpend.forever = FALSE;
 	lpend.loop = 1;
-	lpend.bjump = off - ljmp1;
+	lpend.bjump = (UINT8)(off - ljmp1);
 	off += _emit_LPEND(dryRun, &buf[off], &lpend);
 
 	/* remainder */
 	lcnt1 = bursts - (lcnt1 * cyc);
 
 	if (lcnt1) {
-		off += _emit_LP(dryRun, &buf[off], 1, lcnt1);
+		off += _emit_LP(dryRun, &buf[off], 1, (UINT8)lcnt1);
 		ljmp1 = off;
 		off += _bursts(dryRun, &buf[off], pxs, 1);
 		lpend.cond = ALWAYS;
 		lpend.forever = FALSE;
 		lpend.loop = 1;
-		lpend.bjump = off - ljmp1;
+		lpend.bjump = (UINT8)(off - ljmp1);
 		off += _emit_LPEND(dryRun, &buf[off], &lpend);
 	}
 
@@ -191,7 +191,7 @@ static int _period(BOOLEAN dryRun, UINT8 buf[],
 		off += _emit_MOV(dryRun, &buf[off], CCR, pxs->ccr);
 	}
 
-	off += _emit_SEV(dryRun, &buf[off], ev);
+	off += _emit_SEV(dryRun, &buf[off], (UINT8)ev);
 
 	return off;
 }
@@ -221,7 +221,7 @@ static int _loop_cyclic(BOOLEAN dryRun,
 	off += _emit_MOV(dryRun, &buf[off], DAR, pxs->dstAddr);
 
 	/* loop0 */
-	off += _emit_LP(dryRun, &buf[off], 0, lcnt0);
+	off += _emit_LP(dryRun, &buf[off], 0, (UINT8)lcnt0);
 	ljmp0 = off;
 
 	for (i = 0; i < periods; i++)
@@ -230,7 +230,7 @@ static int _loop_cyclic(BOOLEAN dryRun,
 	lpend.cond = ALWAYS;
 	lpend.forever = FALSE;
 	lpend.loop = 0;
-	lpend.bjump = off - ljmp0;
+	lpend.bjump = (UINT8)(off - ljmp0);
 	off += _emit_LPEND(dryRun, &buf[off], &lpend);
 
 	for (i = 0; i < residue; i++)
@@ -239,7 +239,7 @@ static int _loop_cyclic(BOOLEAN dryRun,
 	lpend.cond = ALWAYS;
 	lpend.forever = TRUE;
 	lpend.loop = 1;
-	lpend.bjump = off - ljmpfe;
+	lpend.bjump = (UINT8)(off - ljmpfe);
 	off += _emit_LPEND(dryRun, &buf[off], &lpend);
 
 	return off;
@@ -252,6 +252,7 @@ NTSTATUS SubmitAudioDMA(
 	UINT32 srcAddr, UINT32 dstAddr,
 	UINT32 len, UINT32 periodLen
 ) {
+    UNREFERENCED_PARAMETER(pDevice);
 	UINT32 ccr = fromDevice ? CC_DSTINC : CC_SRCINC;
 
 	ccr |= CC_SRCNS | CC_DSTNS;

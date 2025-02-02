@@ -28,12 +28,12 @@ PETrust=true
 %CAAUDIORK3X_SA.DeviceDesc%=CAAUDIORK3X_SA, CSAUDIO\RK&CLTR
 
 [DestinationDirs]
-CAAUDIORK3X_SA.CopyList=12
+CAAUDIORK3X_SA_CopyFiles=12
 
 ;======================================================
 ; CAAUDIORK3X_SA
 ;======================================================
-[CAAUDIORK3X_SA.CopyList]
+[CAAUDIORK3X_SA_CopyFiles]
 csaudiork3x.sys
 
 [CAAUDIORK3X_SA.AddReg]
@@ -172,7 +172,7 @@ HKR,EP\0,%PKEY_AudioEndpoint_Supports_EventDriven_Mode%,0x00010001,0x1
 [CAAUDIORK3X_SA.NT]
 Include=ks.inf,wdmaudio.inf
 Needs=KS.Registration, WDMAUDIO.Registration
-CopyFiles=CAAUDIORK3X_SA.CopyList
+CopyFiles=CAAUDIORK3X_SA_CopyFiles
 AddReg=CAAUDIORK3X_SA.AddReg
 
 [CAAUDIORK3X_SA.NT.Interfaces]
@@ -229,7 +229,7 @@ DisplayName=%CsAudioRk3x.SvcDesc%
 ServiceType=1
 StartType=3
 ErrorControl=1
-ServiceBinary=%13%\csaudiork3x.sys
+ServiceBinary=%12%\csaudiork3x.sys
 
 [CAAUDIORK3X_SA.NT.HW]
 AddReg = AUDIOHW.AddReg
