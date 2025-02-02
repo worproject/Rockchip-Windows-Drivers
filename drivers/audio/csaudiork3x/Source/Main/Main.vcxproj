@@ -115,13 +115,8 @@
     <ResourceCompile Include="csaudiork3x.rc" />
   </ItemGroup>
   <ItemGroup>
-    <Inf Exclude="@(Inx)" Include="*.inx" />
+    <Inf Include="csaudiork3x.inx" />
     <FilesToPackage Include="$(TargetPath)" Condition="'$(ConfigurationType)'=='Driver' or '$(ConfigurationType)'=='DynamicLibrary'" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Exclude="@(None)" Include="*.txt;*.htm;*.html" />
-    <None Exclude="@(None)" Include="*.ico;*.cur;*.bmp;*.dlg;*.rct;*.gif;*.jpg;*.jpeg;*.wav;*.jpe;*.tiff;*.tif;*.png;*.rc2" />
-    <None Exclude="@(None)" Include="*.def;*.bat;*.hpj;*.asmx" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="common.h" />

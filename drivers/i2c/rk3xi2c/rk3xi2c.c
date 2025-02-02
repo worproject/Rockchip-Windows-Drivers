@@ -1,5 +1,4 @@
 #include "driver.h"
-#include "stdint.h"
 
 #define bool int
 #define MS_IN_US 1000
@@ -58,7 +57,7 @@ static NTSTATUS GetIntegerProperty(
 	char* propertyStr,
 	UINT32* property
 ) {
-	PRK3XI2C_CONTEXT pDevice = GetDeviceContext(FxDevice);
+	//PRK3XI2C_CONTEXT pDevice = GetDeviceContext(FxDevice);
 	WDFMEMORY outputMemory = WDF_NO_HANDLE;
 
 	NTSTATUS status = STATUS_ACPI_NOT_INITIALIZED;
@@ -79,8 +78,8 @@ static NTSTATUS GetIntegerProperty(
 	inputBuffer->Section.Data3 = 0x4d8c;
 	memcpy(inputBuffer->Section.Data4, uuidend, sizeof(uuidend)); //Avoid Windows defender false positive
 
-	strcpy(inputBuffer->PropertyName, propertyStr);
-	inputBuffer->PropertyNameLength = strlen(propertyStr) + 1;
+	strcpy((CHAR*)inputBuffer->PropertyName, propertyStr);
+	inputBuffer->PropertyNameLength = (ULONG)strlen(propertyStr) + 1;
 
 	PACPI_EVAL_OUTPUT_BUFFER outputBuffer;
 	size_t outputArgumentBufferSize = 8;
@@ -287,6 +286,7 @@ Status
 	PRK3XI2C_CONTEXT pDevice = GetDeviceContext(FxDevice);
 
 	UINT32 version = (read32(pDevice, REG_CON) & (0xff << 16)) >> 16;
+    UNREFERENCED_PARAMETER(version);
 	Rk3xI2CPrint(DEBUG_LEVEL_INFO, DBG_INIT,
 		"Version: %d\n", version);
 
@@ -315,6 +315,7 @@ Status
 
 --*/
 {
+    UNREFERENCED_PARAMETER(FxDevice);
 	UNREFERENCED_PARAMETER(FxTargetState);
 
 	NTSTATUS status = STATUS_SUCCESS;
@@ -379,6 +380,7 @@ VOID OnSpbIoRead(
 	_In_ size_t Length
 )
 {
+    UNREFERENCED_PARAMETER(Length);
 	PRK3XI2C_CONTEXT pDevice = GetDeviceContext(SpbController);
 
 	NTSTATUS status = i2c_xfer(pDevice, SpbTarget, SpbRequest, 1);
@@ -392,6 +394,7 @@ VOID OnSpbIoWrite(
 	_In_ size_t Length
 )
 {
+    UNREFERENCED_PARAMETER(Length);
 	PRK3XI2C_CONTEXT pDevice = GetDeviceContext(SpbController);
 
 	NTSTATUS status = i2c_xfer(pDevice, SpbTarget, SpbRequest, 1);

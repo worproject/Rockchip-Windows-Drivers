@@ -1,5 +1,4 @@
 #include "driver.h"
-#include "stdint.h"
 
 #define bool int
 #define MS_IN_US 1000
@@ -85,8 +84,8 @@ static NTSTATUS GetStringProperty(
 	inputBuffer->Section.Data3 = 0x4d8c;
 	memcpy(inputBuffer->Section.Data4, uuidend, sizeof(uuidend)); //Avoid Windows defender false positive
 
-	strcpy(inputBuffer->PropertyName, propertyStr);
-	inputBuffer->PropertyNameLength = strlen(propertyStr) + 1;
+	strcpy((CHAR*)inputBuffer->PropertyName, propertyStr);
+	inputBuffer->PropertyNameLength = (ULONG)strlen(propertyStr) + 1;
 
 	PACPI_EVAL_OUTPUT_BUFFER outputBuffer;
 	size_t outputBufferSize = FIELD_OFFSET(ACPI_EVAL_OUTPUT_BUFFER, Argument) + sizeof(ACPI_METHOD_ARGUMENT_V1) + propertyLen;

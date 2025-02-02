@@ -1,6 +1,5 @@
 #define DESCRIPTOR_DEF
 #include "driver.h"
-#include "stdint.h"
 
 #define bool int
 #define MS_IN_US 1000
@@ -117,16 +116,16 @@ void udelay(ULONG usec) {
 
 /* ES8288 has 8-bit register addresses, and 8-bit register data */
 struct es8323_init_reg {
-	uint8_t reg;
-	uint8_t val;
+	UINT8 reg;
+	UINT8 val;
 };
 
 NTSTATUS es8323_reg_read(
 	_In_ PES8323_CONTEXT pDevice,
-	uint8_t reg,
-	uint8_t* data
+	UINT8 reg,
+	UINT8* data
 ) {
-	uint8_t raw_data = 0;
+	UINT8 raw_data = 0;
 	NTSTATUS status = SpbXferDataSynchronously(&pDevice->I2CContext, &reg, sizeof(reg), &raw_data, sizeof(raw_data));
 	*data = raw_data;
 	return status;
@@ -134,10 +133,10 @@ NTSTATUS es8323_reg_read(
 
 NTSTATUS es8323_reg_write(
 	_In_ PES8323_CONTEXT pDevice,
-	uint8_t reg,
-	uint8_t data
+	UINT8 reg,
+	UINT8 data
 ) {
-	uint8_t buf[2];
+	UINT8 buf[2];
 	buf[0] = reg;
 	buf[1] = data;
 	return SpbWriteDataSynchronously(&pDevice->I2CContext, buf, sizeof(buf));
@@ -145,11 +144,11 @@ NTSTATUS es8323_reg_write(
 
 NTSTATUS es8323_reg_update(
 	_In_ PES8323_CONTEXT pDevice,
-	uint8_t reg,
-	uint8_t mask,
-	uint8_t val
+	UINT8 reg,
+	UINT8 mask,
+	UINT8 val
 ) {
-	uint8_t tmp = 0, orig = 0;
+	UINT8 tmp = 0, orig = 0;
 
 	NTSTATUS status = es8323_reg_read(pDevice, reg, &orig);
 	if (!NT_SUCCESS(status)) {
@@ -167,12 +166,12 @@ NTSTATUS es8323_reg_update(
 
 /*static void debug_dump_regs(PES8323_CONTEXT pDevice)
 {
-	uint8_t i, reg_byte;
+	UINT8 i, reg_byte;
 	// Show all codec regs
 	for (i = 0; i <= ES8323_DACCONTROL30; i += 16) {
 		uint32_t regs[16];
 		for (int j = 0; j < 16; j++) {
-			es8323_reg_read(pDevice, (uint8_t)(i + j), &reg_byte);
+			es8323_reg_read(pDevice, (UINT8)(i + j), &reg_byte);
 			regs[j] = reg_byte;
 		}
 		DbgPrint("%02x: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x \n", i, regs[0], regs[1], regs[2], regs[3], regs[4], regs[5], regs[6], regs[7],

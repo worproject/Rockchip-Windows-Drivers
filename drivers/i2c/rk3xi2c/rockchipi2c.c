@@ -74,7 +74,7 @@ static void rk3x_i2c_stop(PRK3XI2C_CONTEXT pDevice, NTSTATUS status)
  */
 static void rk3x_i2c_prepare_read(PRK3XI2C_CONTEXT pDevice)
 {
-	unsigned int len = pDevice->currentDescriptor.TransferLength - pDevice->processed;
+	size_t len = pDevice->currentDescriptor.TransferLength - pDevice->processed;
 	UINT32 con;
 
 	con = read32(pDevice, REG_CON);
@@ -98,7 +98,7 @@ static void rk3x_i2c_prepare_read(PRK3XI2C_CONTEXT pDevice)
 	}
 
 	write32(pDevice, REG_CON, con);
-	write32(pDevice, REG_MRXCNT, len);
+	write32(pDevice, REG_MRXCNT, (UINT32)len);
 }
 
 /**
@@ -197,7 +197,7 @@ static void rk3x_i2c_handle_write(PRK3XI2C_CONTEXT pDevice, unsigned int ipd)
 static void rk3x_i2c_handle_read(PRK3XI2C_CONTEXT pDevice, unsigned int ipd)
 {
 	unsigned int i;
-	unsigned int len = pDevice->currentDescriptor.TransferLength - pDevice->processed;
+	size_t len = pDevice->currentDescriptor.TransferLength - pDevice->processed;
 	UINT32 val = 0;
 	UINT8 byte;
 
@@ -385,7 +385,7 @@ NTSTATUS i2c_xfer_single(
 	pDevice->currentMDLChain = mdlChain;
 
 	pDevice->isLastMsg = FALSE;
-	pDevice->I2CAddress = pTarget->Settings.Address;
+	pDevice->I2CAddress = (UINT8)pTarget->Settings.Address;
 	pDevice->isBusy = TRUE;
 	pDevice->state = STATE_START;
 	pDevice->processed = 0;
@@ -435,7 +435,7 @@ NTSTATUS i2c_xfer(PRK3XI2C_CONTEXT pDevice,
 	rk3x_i2c_adapt_div(pDevice, pDevice->baseClock);
 
 	SPB_TRANSFER_DESCRIPTOR descriptor;
-	for (int i = 0; i < TransferCount; i++) {
+	for (ULONG i = 0; i < TransferCount; i++) {
 		PMDL mdlChain;
 
 		SPB_TRANSFER_DESCRIPTOR_INIT(&descriptor);
@@ -448,8 +448,8 @@ NTSTATUS i2c_xfer(PRK3XI2C_CONTEXT pDevice,
 		if (!NT_SUCCESS(status))
 			break;
 
-		transferredLength += descriptor.TransferLength;
-		WdfRequestSetInformation(SpbRequest, transferredLength);
+		transferredLength += (UINT32)descriptor.TransferLength;
+		WdfRequestSetInformation((WDFREQUEST)SpbRequest, transferredLength);
 	}
 
 	WdfWaitLockRelease(pDevice->waitLock);
