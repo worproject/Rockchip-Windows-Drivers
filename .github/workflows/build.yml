@@ -48,7 +48,7 @@ jobs:
         Write-Output "version=$($version)" >> $env:GITHUB_OUTPUT
         
     - name: Upload testsigned driver package artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: RkDrvPkg_${{matrix.PLATFORM}}_${{matrix.CONFIGURATION}}_${{steps.get_version_tag.outputs.version}}_testsigned
         path: ${{env.DRIVER_OUTPUT_DIR}}/*/
