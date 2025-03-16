@@ -29,6 +29,8 @@ These patches are not perfect and you may still encounter issues.
 
 ## storahci.sys: corrupt SMART data or crash in disk.sys
 
+[Tracked with issue 59](https://github.com/worproject/Rockchip-Windows-Drivers/issues/59)
+
 Even with this fix applied, AHCI drives may still return corrupt data for SMART
 requests. This is very rare for the on-chip AHCI controller but happens quite
 frequently for AHCI controllers in PCIe slots.
@@ -50,7 +52,7 @@ build 27765 or later or to not use PCIe-attached SATA controllers.
 
 Even with this fix applied, high-performance NVMe SSDs may cause the system to
 become temporarily unresponsive or may trigger a "DPC Watchdog Violation"
-blue-screen crash when an NVMe controller is under heavly I/O load, e.g. during
+blue-screen crash when an NVMe controller is under heavy I/O load, e.g. during
 prolonged benchmarks or stress testing.
 
 We believe this problem occurs because the SSD works too quickly for the system
