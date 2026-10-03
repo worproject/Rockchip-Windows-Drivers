@@ -37,6 +37,7 @@ This repository contains drivers for RK35xx-based platforms, with a focus on RK3
 |SPDIF||🔴 Not working||
 |SARADC||🔴 Not working||
 |PWM||🔴 Not working||
+|Temperature sensor (TSADC)|[rk3588tsadc](drivers/thermal/rk3588tsadc)|🟢 Working|Requires a UEFI that exposes the TSADC as RKCP3004 to the thermal zone.|
 
 ## Building
 1. Install a recent version of Visual Studio, Windows SDK and WDK.
