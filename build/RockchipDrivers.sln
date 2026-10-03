@@ -37,6 +37,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "arm_smc_lib", "..\drivers\l
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "rk_sip_sdmmc_lib", "..\drivers\sd\rk_sip_sdmmc_lib\rk_sip_sdmmc_lib.vcxproj", "{3F0E7D7D-BB1E-42F9-841F-75204A447CC6}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "rk3588tsadc", "..\drivers\thermal\rk3588tsadc\rk3588tsadc.vcxproj", "{6A3BD9F0-A05D-47BA-8350-12CB920AF506}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|ARM64 = Debug|ARM64
@@ -131,6 +133,12 @@ Global
 		{3F0E7D7D-BB1E-42F9-841F-75204A447CC6}.Release|ARM64.ActiveCfg = Release|ARM64
 		{3F0E7D7D-BB1E-42F9-841F-75204A447CC6}.Release|ARM64.Build.0 = Release|ARM64
 		{3F0E7D7D-BB1E-42F9-841F-75204A447CC6}.Release|ARM64.Deploy.0 = Release|ARM64
+		{6A3BD9F0-A05D-47BA-8350-12CB920AF506}.Debug|ARM64.ActiveCfg = Debug|ARM64
+		{6A3BD9F0-A05D-47BA-8350-12CB920AF506}.Debug|ARM64.Build.0 = Debug|ARM64
+		{6A3BD9F0-A05D-47BA-8350-12CB920AF506}.Debug|ARM64.Deploy.0 = Debug|ARM64
+		{6A3BD9F0-A05D-47BA-8350-12CB920AF506}.Release|ARM64.ActiveCfg = Release|ARM64
+		{6A3BD9F0-A05D-47BA-8350-12CB920AF506}.Release|ARM64.Build.0 = Release|ARM64
+		{6A3BD9F0-A05D-47BA-8350-12CB920AF506}.Release|ARM64.Deploy.0 = Release|ARM64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

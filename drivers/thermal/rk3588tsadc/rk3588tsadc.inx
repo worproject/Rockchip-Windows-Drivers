@@ -1,0 +1,70 @@
+;/*++
+;
+;Module Name:
+;    rk3588tsadc.inf
+;
+;Abstract:
+;    INF file for installing the RK3588 TSADC temperature sensor driver
+;
+;--*/
+
+[Version]
+Signature   = "$WINDOWS NT$"
+Class       = System
+ClassGuid   = {4d36e97d-e325-11ce-bfc1-08002be10318}
+Provider    = %ProviderName%
+CatalogFile = rk3588tsadc.cat
+PnpLockdown = 1
+
+[DestinationDirs]
+DefaultDestDir = 13
+
+[SourceDisksNames]
+1 = %DiskId1%,,,""
+
+[SourceDisksFiles]
+rk3588tsadc.sys = 1,,
+
+[Manufacturer]
+%StdMfg%=Standard,NT$ARCH$.10.0...16299
+
+[Standard.NT$ARCH$.10.0...16299]
+%Tsadc.DeviceDesc%=Tsadc_Device, ACPI\RKCP3004
+
+[Tsadc_Device.NT]
+CopyFiles=Drivers_Dir
+
+[Tsadc_Device.NT.HW]
+AddReg=Tsadc_AddReg
+
+[Drivers_Dir]
+rk3588tsadc.sys
+
+[Tsadc_AddReg]
+HKR,,DeviceCharacteristics,0x10001,0x0100         ; FILE_DEVICE_SECURE_OPEN
+HKR,,Security,,"D:P(A;;GA;;;BA)(A;;GA;;;SY)"      ; administrators and SYSTEM only
+
+;-------------- Service installation
+[Tsadc_Device.NT.Services]
+AddService = rk3588tsadc,%SPSVCINST_ASSOCSERVICE%, Tsadc_Service_Inst
+
+[Tsadc_Service_Inst]
+DisplayName    = %Tsadc.SVCDESC%
+ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
+StartType      = 3               ; SERVICE_DEMAND_START
+ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %13%\rk3588tsadc.sys
+
+[Tsadc_Device.NT.Wdf]
+KmdfService = rk3588tsadc, Tsadc_Wdf
+
+[Tsadc_Wdf]
+KmdfLibraryVersion = $KMDFVERSION$
+
+[Strings]
+SPSVCINST_ASSOCSERVICE = 0x00000002
+ProviderName           = "Meari"
+StdMfg                 = "Rockchip"
+DiskId1                = "RK3588 TSADC Installation Disk #1"
+Tsadc.DeviceDesc       = "RK3588 TSADC Temperature Sensor"
+Tsadc.SVCDESC          = "RK3588 TSADC Temperature Sensor"
